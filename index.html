@@ -255,12 +255,12 @@
       </section>
 
       <!-- ABA RELATORIO -->
-      <section id="tab-relatorio" class="hidden space-y-3">
+      <section id="tab-relatorio" class="hidden space-y-4">
         <div>
           <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
           <select id="sel-class-report" class="w-full border rounded-lg p-2 text-xs"></select>
         </div>
-        <div id="report-content" class="overflow-x-auto"></div>
+        <div id="report-content" class="space-y-6"></div>
       </section>
 
       <!-- ABA GESTAO -->
@@ -348,7 +348,7 @@
       localStorage.setItem(DB_KEY, JSON.stringify(state));
     }
 
-    // --- UTILS ---
+    // --- UTILS DE DATA E FORMATO ---
     const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const escapeHTML = str => (str || '').replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag]));
 
@@ -357,6 +357,38 @@
       t.textContent = msg;
       t.classList.remove('hidden');
       setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    // Função para calcular o intervalo da semana (Segunda a Domingo)
+    function getWeekRange(dateStr) {
+      const parts = dateStr.split('-');
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      
+      const day = d.getDay();
+      const diffToMon = d.getDate() - day + (day === 0 ? -6 : 1);
+      
+      const mon = new Date(d.setDate(diffToMon));
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+
+      const fmt = (dt) => {
+        const day = String(dt.getDate()).padStart(2, '0');
+        const month = String(dt.getMonth() + 1).padStart(2, '0');
+        const year = dt.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
+      const keyFmt = (dt) => {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      return {
+        key: keyFmt(mon),
+        label: `Semana de ${fmt(mon)} a ${fmt(sun)}`
+      };
     }
 
     document.getElementById('inp-chamada-date').valueAsDate = new Date();
@@ -484,7 +516,6 @@
       section.classList.remove('hidden');
       const students = state.students.filter(s => s.classId === classId);
       
-      // Ordena as outras turmas em ordem alfabética para o dropdown de transferência
       const otherClasses = state.classes
         .filter(c => c.id !== classId)
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
@@ -760,7 +791,7 @@
       renderAgenda();
     }
 
-    // --- RELATÓRIO COMPLETO ---
+    // --- RELATÓRIO SEPARADO POR SEMANA ---
     document.getElementById('sel-class-report').addEventListener('change', renderRelatorio);
 
     function renderRelatorio() {
@@ -769,50 +800,105 @@
       if (!classId) { container.innerHTML = ''; return; }
 
       const students = state.students.filter(s => s.classId === classId);
+      if (students.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno nesta turma.</p>';
+        return;
+      }
 
-      let html = `
-        <table class="w-full text-left text-xs bg-white rounded-lg border border-slate-200">
-          <thead class="bg-slate-100 font-semibold text-slate-600 border-b">
-            <tr>
-              <th class="p-2">Aluno</th>
-              <th class="p-2 text-center text-emerald-700 bg-emerald-50">Presença</th>
-              <th class="p-2 text-center text-amber-700 bg-amber-50">Atraso</th>
-              <th class="p-2 text-center text-red-700 bg-red-50">Falta</th>
-              <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
-              <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
-              <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-      `;
+      // Agrupar registros da chamada por Semana
+      const weeksMap = {};
 
-      students.forEach(s => {
-        const records = Object.keys(state.attendance)
-          .filter(k => k.startsWith(`${s.id}_`))
-          .map(k => state.attendance[k]);
+      Object.keys(state.attendance).forEach(key => {
+        const parts = key.split('_');
+        const studentId = parts[0];
+        const dateStr = parts[1];
 
-        const p = records.filter(r => r.status === 'p').length;
-        const a = records.filter(r => r.status === 'a').length;
-        const f = records.filter(r => r.status === 'f').length;
+        // Verificar se o aluno pertence a esta turma
+        if (students.some(s => s.id === studentId)) {
+          const weekInfo = getWeekRange(dateStr);
 
-        const tf = records.filter(r => r.task === 'f').length;
-        const ta = records.filter(r => r.task === 'a').length;
-        const tn = records.filter(r => r.task === 'n').length;
+          if (!weeksMap[weekInfo.key]) {
+            weeksMap[weekInfo.key] = {
+              label: weekInfo.label,
+              recordsByStudent: {}
+            };
+          }
+
+          if (!weeksMap[weekInfo.key].recordsByStudent[studentId]) {
+            weeksMap[weekInfo.key].recordsByStudent[studentId] = [];
+          }
+
+          weeksMap[weekInfo.key].recordsByStudent[studentId].push(state.attendance[key]);
+        }
+      });
+
+      const sortedWeekKeys = Object.keys(weeksMap).sort().reverse();
+
+      if (sortedWeekKeys.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhuma chamada registrada para esta turma ainda.</p>';
+        return;
+      }
+
+      let html = '';
+
+      sortedWeekKeys.forEach(weekKey => {
+        const week = weeksMap[weekKey];
 
         html += `
-          <tr>
-            <td class="p-2 font-medium">${escapeHTML(s.name)}</td>
-            <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/50">${p}</td>
-            <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/50">${a}</td>
-            <td class="p-2 text-center font-bold text-red-600 bg-red-50/50">${f}</td>
-            <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/50">${tf}</td>
-            <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/50">${ta}</td>
-            <td class="p-2 text-center font-bold text-red-600 bg-red-50/50">${tn}</td>
-          </tr>
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden space-y-2">
+            <div class="bg-slate-800 text-white px-4 py-2 flex justify-between items-center">
+              <span class="font-bold text-xs">${escapeHTML(week.label)}</span>
+              <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">Resumo Semanal</span>
+            </div>
+            <div class="overflow-x-auto p-2">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 font-semibold text-slate-600 border-b">
+                  <tr>
+                    <th class="p-2">Aluno</th>
+                    <th class="p-2 text-center text-emerald-700 bg-emerald-50">Presença</th>
+                    <th class="p-2 text-center text-amber-700 bg-amber-50">Atraso</th>
+                    <th class="p-2 text-center text-red-700 bg-red-50">Falta</th>
+                    <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
+                    <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
+                    <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+        `;
+
+        students.forEach(s => {
+          const records = week.recordsByStudent[s.id] || [];
+
+          const p = records.filter(r => r.status === 'p').length;
+          const a = records.filter(r => r.status === 'a').length;
+          const f = records.filter(r => r.status === 'f').length;
+
+          const tf = records.filter(r => r.task === 'f').length;
+          const ta = records.filter(r => r.task === 'a').length;
+          const tn = records.filter(r => r.task === 'n').length;
+
+          html += `
+            <tr>
+              <td class="p-2 font-medium">${escapeHTML(s.name)}</td>
+              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${p}</td>
+              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${a}</td>
+              <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${f}</td>
+              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${tf}</td>
+              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${ta}</td>
+              <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${tn}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
         `;
       });
 
-      container.innerHTML = html + '</tbody></table>';
+      container.innerHTML = html;
     }
 
     // --- ABA GESTÃO COM NOTAS E STATUS ---
