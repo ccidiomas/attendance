@@ -1,682 +1,983 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestão Escolar</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .tab-btn.active {
-            border-bottom: 3px solid #3b82f6;
-            color: #1d4ed8;
-            font-weight: 600;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Presença CCI</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'DM Sans', sans-serif; background-color: #f1f5f9; }
+    .tab-active { border-bottom: 3px solid #60a5fa; color: #60a5fa; font-weight: 600; }
+    
+    .btn-toggle { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; border: 2px solid transparent; transition: all 0.15s; cursor: pointer; }
+    
+    /* Presença */
+    .st-p { background: #dcfce7; color: #166534; }
+    .st-p.active { border-color: #166534; font-weight: 700; }
+    .st-a { background: #fef9c3; color: #854d0e; }
+    .st-a.active { border-color: #854d0e; font-weight: 700; }
+    .st-f { background: #fee2e2; color: #991b1b; }
+    .st-f.active { border-color: #991b1b; font-weight: 700; }
+
+    /* Tarefa */
+    .tk-f { background: #10b981; color: #fff; }
+    .tk-f.active { border-color: #047857; font-weight: 700; }
+    .tk-a { background: #f59e0b; color: #fff; }
+    .tk-a.active { border-color: #b45309; font-weight: 700; }
+    .tk-n { background: #ef4444; color: #fff; }
+    .tk-n.active { border-color: #b91c1c; font-weight: 700; }
+  </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800">
+<body class="min-h-screen">
 
-    <!-- Header / Navbar -->
-    <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
-                <div class="bg-white text-indigo-700 p-2.5 rounded-xl shadow-sm">
-                    <i class="fa-solid fa-graduation-cap text-2xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold leading-tight">Portal Escolar</h1>
-                    <p class="text-xs text-indigo-200">Gestão de Turmas e Alunos</p>
-                </div>
-            </div>
+  <!-- TELA DE LOGIN / PROTEÇÃO POR SENHA -->
+  <div id="login-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full space-y-4 text-center">
+      <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+        🔒
+      </div>
+      <div>
+        <h2 class="text-lg font-bold text-slate-800">Acesso Restrito CCI</h2>
+        <p class="text-xs text-slate-500 mt-1">Digite a senha da escola para acessar o sistema de presença.</p>
+      </div>
+      <form id="form-login" class="space-y-3">
+        <input id="login-password" type="password" placeholder="Digite a senha..." required class="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-center focus:ring-2 focus:ring-blue-400 outline-none">
+        <p id="login-error" class="text-red-500 text-xs hidden">Senha incorreta. Tente novamente.</p>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition">Entrar no Sistema</button>
+      </form>
+    </div>
+  </div>
 
-            <!-- Navegação por Abas -->
-            <nav class="flex space-x-1 bg-indigo-800/60 p-1 rounded-xl text-sm font-medium">
-                <button onclick="switchTab('busca')" id="tab-busca" class="tab-btn active px-4 py-2 rounded-lg transition-all text-white hover:bg-indigo-700/50 flex items-center gap-2">
-                    <i class="fa-solid fa-magnifying-glass"></i> Busca Rápida
-                </button>
-                <button onclick="switchTab('turmas')" id="tab-turmas" class="tab-btn px-4 py-2 rounded-lg transition-all text-indigo-100 hover:bg-indigo-700/50 flex items-center gap-2">
-                    <i class="fa-solid fa-chalkboard-user"></i> Turmas
-                </button>
-                <button onclick="switchTab('alunos')" id="tab-alunos" class="tab-btn px-4 py-2 rounded-lg transition-all text-indigo-100 hover:bg-indigo-700/50 flex items-center gap-2">
-                    <i class="fa-solid fa-user-graduate"></i> Alunos
-                </button>
-            </nav>
+  <!-- MODAL DE EDIÇÃO DE TURMA -->
+  <div id="edit-class-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Editar Turma</h3>
+        <button onclick="closeEditClassModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+      <form id="form-edit-class" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-cls-id">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome do Professor *:</label>
+          <input id="edit-cls-teacher" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
         </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome da Turma *:</label>
+          <input id="edit-cls-name" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Frequência:</label>
+          <select id="edit-cls-freq" class="w-full border p-2 rounded">
+            <option value="1x2h">1x na semana (2h por aula)</option>
+            <option value="2x1h">2x na semana (1h por aula)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Código da Escola:</label>
+          <input id="edit-cls-code" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <span class="block mb-1 font-semibold text-slate-600">Dias da Semana:</span>
+          <div class="flex flex-wrap gap-2" id="edit-weekdays">
+            <label><input type="checkbox" value="Segunda"> Seg</label>
+            <label><input type="checkbox" value="Terça"> Ter</label>
+            <label><input type="checkbox" value="Quarta"> Qua</label>
+            <label><input type="checkbox" value="Quinta"> Qui</label>
+            <label><input type="checkbox" value="Sexta"> Sex</label>
+            <label><input type="checkbox" value="Sábado"> Sab</label>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditClassModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+          <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO DE ALUNO -->
+  <div id="edit-student-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Editar Informações do Aluno</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+      <form id="form-edit-student" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-stu-id">
+        <input type="hidden" id="edit-stu-class-id">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Código do Aluno:</label>
+          <input id="edit-stu-code" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome do Aluno *:</label>
+          <input id="edit-stu-name" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Responsável:</label>
+          <input id="edit-stu-parent" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Telefone:</label>
+          <input id="edit-stu-phone" type="tel" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+          <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL DO SITE (OCULTO ATÉ O LOGIN) -->
+  <div id="app-content" class="hidden">
+    <header class="relative overflow-hidden">
+      <div class="h-44 sm:h-52 flex items-center px-4 sm:px-6" style="background: linear-gradient(135deg, #60a5fa 0%, #f87171 100%);">
+        <div class="max-w-3xl mx-auto w-full flex justify-between items-center">
+          <div>
+            <h1 class="text-white text-2xl sm:text-3xl font-bold drop-shadow">Controle de Presença CCI</h1>
+            <p class="text-white/90 text-xs sm:text-sm mt-1">Gerenciamento Integrado de Turmas, Tarefas e Agenda</p>
+          </div>
+          <button onclick="logout()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg border border-white/40">Sair 🚪</button>
+        </div>
+      </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 py-8">
+    <!-- FILTROS GLOBAIS -->
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 mt-4 space-y-3">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1">
+          <label class="block mb-1 text-xs font-bold text-slate-700">Filtrar por Professor(a) [Geral]</label>
+          <select id="sel-filter-teacher" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-400 outline-none">
+            <option value="">Todos os professores</option>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block mb-1 text-xs font-bold text-slate-700">Filtrar por Dia (Turmas)</label>
+          <div class="flex flex-wrap gap-2 text-xs" id="weekdays-filter">
+            <label><input type="checkbox" value="Segunda"> Seg</label>
+            <label><input type="checkbox" value="Terça"> Ter</label>
+            <label><input type="checkbox" value="Quarta"> Qua</label>
+            <label><input type="checkbox" value="Quinta"> Qui</label>
+            <label><input type="checkbox" value="Sexta"> Sex</label>
+            <label><input type="checkbox" value="Sábado"> Sab</label>
+          </div>
+        </div>
+      </div>
+    </div>
 
-        <!-- ================= ABA 1: BUSCA GLOBAL & DASHBOARD ================= -->
-        <section id="section-busca" class="space-y-6">
-            <!-- Métricas Rápidas -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4">
-                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total de Alunos</p>
-                        <h3 id="stat-total-alunos" class="text-2xl font-bold text-slate-800">0</h3>
-                    </div>
-                </div>
+    <nav class="max-w-3xl mx-auto flex border-b border-slate-200 mt-4 px-4 sm:px-0 overflow-x-auto">
+      <button class="tab-btn tab-active px-4 py-2 text-xs sm:text-sm text-slate-600 whitespace-nowrap" data-tab="turmas">Turmas</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="busca">🔍 Buscar Aluno</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="chamada">Chamada</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="agenda">Agenda & Feriados</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="relatorio">Relatório</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="gestao">Gestão</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="backup">Backup</button>
+    </nav>
 
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4">
-                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold">
-                        <i class="fa-solid fa-school"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total de Turmas</p>
-                        <h3 id="stat-total-turmas" class="text-2xl font-bold text-slate-800">0</h3>
-                    </div>
-                </div>
-
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4">
-                    <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-xl font-bold">
-                        <i class="fa-solid fa-search"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pesquisa Ativa</p>
-                        <p class="text-sm font-medium text-slate-600">Busca por Aluno, Código ou Turma</p>
-                    </div>
-                </div>
+    <main class="max-w-3xl mx-auto p-4 sm:p-6">
+      <!-- ABA TURMAS -->
+      <section id="tab-turmas" class="space-y-4">
+        <form id="form-create-class" class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Criar Nova Turma</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <input id="inp-teacher" type="text" placeholder="Nome do Professor *" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <input id="inp-classname" type="text" placeholder="Nome da Turma *" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <select id="inp-freq" class="border p-2 rounded">
+              <option value="1x2h">1x na semana (2h por aula)</option>
+              <option value="2x1h">2x na semana (1h por aula)</option>
+            </select>
+            <input id="inp-code" type="text" placeholder="Código da Escola (opcional)" class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="text-xs">
+            <span class="block mb-1 font-semibold text-slate-600">Dias da Semana:</span>
+            <div class="flex flex-wrap gap-2" id="create-weekdays">
+              <label><input type="checkbox" value="Segunda"> Seg</label>
+              <label><input type="checkbox" value="Terça"> Ter</label>
+              <label><input type="checkbox" value="Quarta"> Qua</label>
+              <label><input type="checkbox" value="Quinta"> Qui</label>
+              <label><input type="checkbox" value="Sexta"> Sex</label>
+              <label><input type="checkbox" value="Sábado"> Sab</label>
             </div>
+          </div>
+          <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-600">Criar Turma</button>
+        </form>
 
-            <!-- Caixa de Pesquisa Principal -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-magnifying-glass text-indigo-600"></i> Pesquisa Rápida
-                        </h2>
-                        <p class="text-xs text-slate-500">Digite o nome do aluno, código de matrícula ou o nome da turma/série.</p>
-                    </div>
-                </div>
+        <div id="class-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        <div id="class-details-section" class="hidden mt-4"></div>
+      </section>
 
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                    <input type="text" id="global-search-input" onkeyup="filtrarPesquisaGlobal()"
-                           placeholder="Buscar por Nome do Aluno, Código Escolar, Turma ou Professor..."
-                           class="w-full pl-12 pr-10 py-3.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-800 font-medium placeholder-slate-400 outline-none transition-all">
-                    <button onclick="limparBusca()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
-                        <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                </div>
-            </div>
+      <!-- ABA BUSCAR ALUNO -->
+      <section id="tab-busca" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Pesquisar Aluno</h2>
+          <p class="text-xs text-slate-500">Busque pelo nome do aluno, código individual, código da escola ou nome da turma.</p>
+          <input id="inp-search-student" type="text" placeholder="Digite para pesquisar..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none">
+        </div>
+        <div id="search-results" class="space-y-2"></div>
+      </section>
 
-            <!-- Resultados da Pesquisa -->
-            <div>
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-md font-semibold text-slate-700">Resultados Encontrados (<span id="count-resultados">0</span>)</h3>
-                </div>
-                <div id="container-resultados-busca" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Cards de alunos renderizados via JS -->
-                </div>
-            </div>
-        </section>
+      <!-- ABA CHAMADA -->
+      <section id="tab-chamada" class="hidden space-y-3">
+        <div class="flex flex-col sm:flex-row gap-2 items-end">
+          <div class="flex-1 w-full">
+            <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
+            <select id="sel-class-chamada" class="w-full border rounded-lg p-2 text-xs"></select>
+          </div>
+          <div class="w-full sm:w-auto">
+            <label class="block mb-1 text-xs font-medium text-slate-700">Data da Aula</label>
+            <input id="inp-chamada-date" type="date" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <button id="btn-save-chamada" class="bg-amber-400 hover:bg-amber-500 text-slate-800 px-4 py-2 rounded-lg text-xs font-bold w-full sm:w-auto">Salvar Registro</button>
+        </div>
+        <div id="chamada-list" class="space-y-2"></div>
+      </section>
 
-        <!-- ================= ABA 2: GERENCIAR TURMAS ================= -->
-        <section id="section-turmas" class="hidden space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Formulário Cadastro de Turma -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 h-fit space-y-4">
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-plus-circle text-emerald-600"></i> Nova Turma
-                    </h2>
-                    <form id="form-cadastrar-turma" onsubmit="salvarNovaTurma(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome da Turma / Identificador</label>
-                            <input type="text" id="turma-nome" placeholder="Ex: 8º Ano A" required
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Série / Ano</label>
-                                <input type="text" id="turma-serie" placeholder="Ex: 8º Ano" required
-                                       class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Turno</label>
-                                <select id="turma-turno" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                                    <option value="Manhã">Manhã</option>
-                                    <option value="Tarde">Tarde</option>
-                                    <option value="Noite">Noite</option>
-                                    <option value="Integral">Integral</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Professor Responsável / Regente</label>
-                            <input type="text" id="turma-professor" placeholder="Ex: Prof. Carlos Silva" required
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Sala / Local</label>
-                            <input type="text" id="turma-sala" placeholder="Ex: Sala 12 - Bloco B"
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-sm">
-                            <i class="fa-solid fa-floppy-disk"></i> Cadastrar Turma
-                        </button>
-                    </form>
-                </div>
+      <!-- ABA AGENDA & FERIADOS -->
+      <section id="tab-agenda" class="hidden space-y-4">
+        <form id="form-create-agenda" class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Cadastrar Feriado / Data sem Aula</h2>
+          <p class="text-xs text-slate-500">Dias cadastrados aqui abonam a contagem de faltas automáticas do aluno.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <input id="agenda-date" type="date" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <input id="agenda-desc" type="text" placeholder="Descrição (Ex: Carnaval)" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <select id="agenda-type" class="border p-2 rounded">
+              <option value="holiday">Feriado / Recesso</option>
+              <option value="event">Evento Escolar</option>
+            </select>
+          </div>
+          <button type="submit" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-600">Adicionar Evento</button>
+        </form>
 
-                <!-- Lista de Turmas -->
-                <div class="lg:col-span-2 space-y-4">
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-indigo-600"></i> Turmas Cadastradas
-                    </h2>
-                    <div id="container-lista-turmas" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Cards das turmas serão carregados aqui -->
-                    </div>
-                </div>
-            </div>
-        </section>
+        <div id="agenda-list" class="space-y-2"></div>
+      </section>
 
-        <!-- ================= ABA 3: GERENCIAR ALUNOS ================= -->
-        <section id="section-alunos" class="hidden space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Formulário Cadastro de Aluno -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 h-fit space-y-4">
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-user-plus text-blue-600"></i> Novo Aluno
-                    </h2>
-                    <form id="form-cadastrar-aluno" onsubmit="salvarNovoAluno(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo do Aluno</label>
-                            <input type="text" id="aluno-nome" placeholder="Ex: Ana Maria Souza" required
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Código da Escola / Matrícula</label>
-                                <input type="text" id="aluno-codigo" placeholder="Ex: 2024-089" required
-                                       class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Turma</label>
-                                <select id="aluno-turma-select" required class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                                    <!-- Opções dinâmicas -->
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Responsável</label>
-                            <input type="text" id="aluno-responsavel" placeholder="Ex: Roberto Souza" required
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Telefone do Responsável</label>
-                            <input type="tel" id="aluno-telefone" placeholder="Ex: (11) 98765-4321" required
-                                   class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-sm">
-                            <i class="fa-solid fa-user-check"></i> Cadastrar Aluno
-                        </button>
-                    </form>
-                </div>
+      <!-- ABA RELATORIO -->
+      <section id="tab-relatorio" class="hidden space-y-3">
+        <div>
+          <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
+          <select id="sel-class-report" class="w-full border rounded-lg p-2 text-xs"></select>
+        </div>
+        <div id="report-content" class="overflow-x-auto"></div>
+      </section>
 
-                <!-- Tabela de Alunos -->
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-users text-indigo-600"></i> Lista de Alunos
-                        </h2>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm text-slate-600">
-                                <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                                    <tr>
-                                        <th class="px-4 py-3">Código</th>
-                                        <th class="px-4 py-3">Aluno</th>
-                                        <th class="px-4 py-3">Turma</th>
-                                        <th class="px-4 py-3">Responsável</th>
-                                        <th class="px-4 py-3 text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tabela-alunos-body" class="divide-y divide-slate-100">
-                                    <!-- Renderizado por JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+      <!-- ABA GESTAO -->
+      <section id="tab-gestao" class="hidden space-y-3">
+        <h2 class="font-bold text-slate-800 text-sm">Alunos com Excesso de Faltas (≥ 2 Horas)</h2>
+        <p class="text-xs text-slate-500">Faltas em feriados ou eventos da Agenda são abonadas automaticamente.</p>
+        <div id="gestao-content" class="space-y-3"></div>
+      </section>
 
+      <!-- ABA BACKUP -->
+      <section id="tab-backup" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Backup e Restauração dos Dados</h2>
+          <p class="text-xs text-slate-500">Exporte seus dados para não perder registros ou importe um arquivo JSON antigo.</p>
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button id="btn-export-backup" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700">⬇️ Baixar Backup (JSON)</button>
+            <label class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-semibold border cursor-pointer text-center hover:bg-slate-200">
+              📂 Restaurar Backup
+              <input type="file" id="inp-import-backup" accept=".json" class="hidden">
+            </label>
+          </div>
+        </div>
+      </section>
     </main>
+  </div>
 
-    <!-- ================= MODAL DE EDIÇÃO DE TURMA ================= -->
-    <div id="modal-editar-turma" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Editar Informações da Turma
-                </h3>
-                <button onclick="fecharModalTurma()" class="text-slate-400 hover:text-slate-600 p-1">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs shadow-lg z-50"></div>
+
+  <script>
+    // --- CONTROLE DE SENHA / SISTEMA DE LOGIN ---
+    const SYSTEM_PASSWORD = 'cci123'; // <--- SENHA DA ESCOLA AQUI
+    const AUTH_KEY = 'cci_app_authenticated';
+
+    function checkAuth() {
+      const isAuth = sessionStorage.getItem(AUTH_KEY);
+      if (isAuth === 'true') {
+        document.getElementById('login-modal').classList.add('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
+        renderAll();
+      } else {
+        document.getElementById('login-modal').classList.remove('hidden');
+        document.getElementById('app-content').classList.add('hidden');
+      }
+    }
+
+    document.getElementById('form-login').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pwd = document.getElementById('login-password').value;
+      if (pwd === SYSTEM_PASSWORD) {
+        sessionStorage.setItem(AUTH_KEY, 'true');
+        document.getElementById('login-error').classList.add('hidden');
+        checkAuth();
+      } else {
+        document.getElementById('login-error').classList.remove('hidden');
+      }
+    });
+
+    function logout() {
+      sessionStorage.removeItem(AUTH_KEY);
+      checkAuth();
+    }
+
+    // --- ESTADO INICIAL ---
+    const DB_KEY = 'cci_app_data_v3';
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(DB_KEY);
+        const data = raw ? JSON.parse(raw) : {};
+        return {
+          classes: data.classes || [],
+          students: data.students || [],
+          attendance: data.attendance || {},
+          agenda: data.agenda || [],
+          managementNotes: data.managementNotes || {}
+        };
+      } catch (e) {
+        console.error("Erro ao carregar banco:", e);
+        return { classes: [], students: [], attendance: {}, agenda: [], managementNotes: {} };
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(DB_KEY, JSON.stringify(state));
+    }
+
+    // --- UTILS ---
+    const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const escapeHTML = str => (str || '').replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag]));
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    document.getElementById('inp-chamada-date').valueAsDate = new Date();
+
+    // --- FILTROS DE PROFESSOR E DIA ---
+    function getSelectedTeacher() {
+      return document.getElementById('sel-filter-teacher').value;
+    }
+
+    function getFilteredClasses() {
+      const teacher = getSelectedTeacher();
+      const selectedDays = Array.from(document.querySelectorAll('#weekdays-filter input:checked')).map(cb => cb.value);
+
+      return state.classes.filter(c => {
+        const matchTeacher = !teacher || c.teacher === teacher;
+        const matchDays = selectedDays.length === 0 || selectedDays.some(d => (c.weekdays || []).includes(d));
+        return matchTeacher && matchDays;
+      });
+    }
+
+    document.getElementById('sel-filter-teacher').addEventListener('change', () => {
+      renderAll();
+    });
+    document.getElementById('weekdays-filter').addEventListener('change', renderClasses);
+
+    // --- NAVEGAÇÃO DE ABAS ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+        renderAll();
+      });
+    });
+
+    // --- GERENCIAMENTO DE TURMAS ---
+    document.getElementById('form-create-class').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const teacher = document.getElementById('inp-teacher').value.trim();
+      const name = document.getElementById('inp-classname').value.trim();
+      const freq = document.getElementById('inp-freq').value;
+      const code = document.getElementById('inp-code').value.trim();
+      const weekdays = Array.from(document.querySelectorAll('#create-weekdays input:checked')).map(cb => cb.value);
+
+      state.classes.push({ id: genId(), teacher, name, freq, code, weekdays });
+      saveState();
+      showToast('Turma criada com sucesso!');
+      e.target.reset();
+      renderAll();
+    });
+
+    function renderClasses() {
+      const container = document.getElementById('class-list');
+      const classes = getFilteredClasses();
+
+      container.innerHTML = classes.map(c => {
+        const count = state.students.filter(s => s.classId === c.id).length;
+        return `
+          <div class="bg-white p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start">
+                <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(c.name)} ${c.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(c.code)})</span>` : ''}</h3>
+                <span class="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${count} alu.</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1">Prof: <b>${escapeHTML(c.teacher)}</b></p>
+              <p class="text-[10px] text-slate-400">${(c.weekdays || []).join(', ') || 'Sem dias'}</p>
             </div>
-            <form id="form-editar-turma" onsubmit="salvarEdicaoTurma(event)" class="space-y-4">
-                <input type="hidden" id="edit-turma-id">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome da Turma</label>
-                    <input type="text" id="edit-turma-nome" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Série / Ano</label>
-                        <input type="text" id="edit-turma-serie" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Turno</label>
-                        <select id="edit-turma-turno" class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                            <option value="Manhã">Manhã</option>
-                            <option value="Tarde">Tarde</option>
-                            <option value="Noite">Noite</option>
-                            <option value="Integral">Integral</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Professor Responsável</label>
-                    <input type="text" id="edit-turma-professor" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Sala / Local</label>
-                    <input type="text" id="edit-turma-sala" class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" onclick="fecharModalTurma()" class="px-4 py-2 border rounded-xl text-slate-600 hover:bg-slate-100 text-sm">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium">Salvar Alterações</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ================= MODAL DE EDIÇÃO DE ALUNO ================= -->
-    <div id="modal-editar-aluno" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-user-pen text-blue-600"></i> Editar Informações do Aluno
-                </h3>
-                <button onclick="fecharModalAluno()" class="text-slate-400 hover:text-slate-600 p-1">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
+            <div class="flex gap-1 mt-2">
+              <button onclick="openClassDetails('${c.id}')" class="flex-1 bg-indigo-50 text-indigo-600 py-1 rounded text-xs font-semibold hover:bg-indigo-100">Alunos</button>
+              <button onclick="openEditClassModal('${c.id}')" class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold hover:bg-slate-200">Editar ✏️</button>
             </div>
-            <form id="form-editar-aluno" onsubmit="salvarEdicaoAluno(event)" class="space-y-4">
-                <input type="hidden" id="edit-aluno-id">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Completo do Aluno</label>
-                    <input type="text" id="edit-aluno-nome" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Código da Escola</label>
-                        <input type="text" id="edit-aluno-codigo" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Turma</label>
-                        <select id="edit-aluno-turma-select" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                            <!-- Opções dinâmicas -->
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Responsável</label>
-                    <input type="text" id="edit-aluno-responsavel" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Telefone do Responsável</label>
-                    <input type="tel" id="edit-aluno-telefone" required class="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" onclick="fecharModalAluno()" class="px-4 py-2 border rounded-xl text-slate-600 hover:bg-slate-100 text-sm">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium">Salvar Alterações</button>
-                </div>
-            </form>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- MODAL DE EDIÇÃO DE TURMA ---
+    function openEditClassModal(classId) {
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
+
+      document.getElementById('edit-cls-id').value = cls.id;
+      document.getElementById('edit-cls-teacher').value = cls.teacher || '';
+      document.getElementById('edit-cls-name').value = cls.name || '';
+      document.getElementById('edit-cls-freq').value = cls.freq || '1x2h';
+      document.getElementById('edit-cls-code').value = cls.code || '';
+
+      const checkboxes = document.querySelectorAll('#edit-weekdays input');
+      checkboxes.forEach(cb => {
+        cb.checked = (cls.weekdays || []).includes(cb.value);
+      });
+
+      document.getElementById('edit-class-modal').classList.remove('hidden');
+    }
+
+    function closeEditClassModal() {
+      document.getElementById('edit-class-modal').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-class').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const classId = document.getElementById('edit-cls-id').value;
+      const cls = state.classes.find(c => c.id === classId);
+
+      if (cls) {
+        cls.teacher = document.getElementById('edit-cls-teacher').value.trim();
+        cls.name = document.getElementById('edit-cls-name').value.trim();
+        cls.freq = document.getElementById('edit-cls-freq').value;
+        cls.code = document.getElementById('edit-cls-code').value.trim();
+        cls.weekdays = Array.from(document.querySelectorAll('#edit-weekdays input:checked')).map(cb => cb.value);
+
+        saveState();
+        showToast('Turma atualizada com sucesso!');
+        closeEditClassModal();
+        renderAll();
+      }
+    });
+
+    function openClassDetails(classId) {
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
+
+      const section = document.getElementById('class-details-section');
+      section.classList.remove('hidden');
+      const students = state.students.filter(s => s.classId === classId);
+      const otherClasses = state.classes.filter(c => c.id !== classId);
+
+      section.innerHTML = `
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(cls.name)} - Alunos</h3>
+            <button onclick="document.getElementById('class-details-section').classList.add('hidden')" class="text-xs text-slate-400">Fechar</button>
+          </div>
+          <form id="form-add-student" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input id="stu-code" type="text" placeholder="Código" class="border p-1.5 rounded text-xs">
+            <input id="stu-name" type="text" placeholder="Nome *" required class="border p-1.5 rounded text-xs">
+            <input id="stu-parent" type="text" placeholder="Responsável" class="border p-1.5 rounded text-xs">
+            <input id="stu-phone" type="tel" placeholder="Telefone" class="border p-1.5 rounded text-xs">
+            <button type="submit" class="sm:col-span-2 bg-emerald-500 text-white py-1 rounded text-xs font-semibold">Adicionar Aluno</button>
+          </form>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-[10px] text-slate-500 uppercase">
+                <tr>
+                  <th class="p-1.5">Nome</th>
+                  <th class="p-1.5">Responsável</th>
+                  <th class="p-1.5">Transferir</th>
+                  <th class="p-1.5">Ações</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${students.map(s => `
+                  <tr>
+                    <td class="p-1.5 font-medium">${escapeHTML(s.name)} ${s.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(s.code)})</span>` : ''}</td>
+                    <td class="p-1.5">${escapeHTML(s.parent || '-')}<br><span class="text-slate-400">${escapeHTML(s.phone || '')}</span></td>
+                    <td class="p-1.5">
+                      <select onchange="transferStudent('${s.id}', this.value)" class="border text-[11px] p-1 rounded">
+                        <option value="">Mover...</option>
+                        ${otherClasses.map(oc => `<option value="${oc.id}">${escapeHTML(oc.name)}</option>`).join('')}
+                      </select>
+                    </td>
+                    <td class="p-1.5 space-x-1">
+                      <button onclick="openEditStudentModal('${s.id}', '${cls.id}')" class="text-blue-600 hover:underline">Editar ✏️</button>
+                      <button onclick="deleteStudent('${s.id}', '${cls.id}')" class="text-red-500 hover:underline">Excluir</button>
+                    </td>
+                  </tr>
+                `).join('') || '<tr><td colspan="4" class="p-2 text-center text-slate-400">Nenhum aluno.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
         </div>
-    </div>
+      `;
 
-    <!-- ================= JAVASCRIPT ================= -->
-    <script>
-        // Dados Iniciais / LocalStorage
-        let turmas = JSON.parse(localStorage.getItem('escola_turmas')) || [
-            { id: '1', nome: '8º Ano A', serie: '8º Ano', turno: 'Manhã', professor: 'Prof. Carlos Silva', sala: 'Sala 12' },
-            { id: '2', nome: '9º Ano B', serie: '9º Ano', turno: 'Tarde', professor: 'Profa. Mariana Costa', sala: 'Sala 05' }
-        ];
+      document.getElementById('form-add-student').onsubmit = (e) => {
+        e.preventDefault();
+        state.students.push({
+          id: genId(),
+          classId: cls.id,
+          code: document.getElementById('stu-code').value.trim(),
+          name: document.getElementById('stu-name').value.trim(),
+          parent: document.getElementById('stu-parent').value.trim(),
+          phone: document.getElementById('stu-phone').value.trim()
+        });
+        saveState();
+        showToast('Aluno adicionado!');
+        openClassDetails(cls.id);
+        renderClasses();
+      };
+    }
 
-        let alunos = JSON.parse(localStorage.getItem('escola_alunos')) || [
-            { id: '101', nome: 'Ana Clara Souza', codigo: '2024-001', turmaId: '1', responsavel: 'Roberto Souza', telefone: '(11) 98765-4321' },
-            { id: '102', nome: 'Lucas Gabriel Lima', codigo: '2024-002', turmaId: '1', responsavel: 'Patrícia Lima', telefone: '(11) 97654-3210' },
-            { id: '103', nome: 'Beatriz Santos', codigo: '2024-003', turmaId: '2', responsavel: 'Marcos Santos', telefone: '(11) 91234-5678' }
-        ];
+    // --- ABA PESQUISAR ALUNO ---
+    document.getElementById('inp-search-student')?.addEventListener('input', renderSearchStudent);
 
-        // Salvar dados no LocalStorage
-        function persistirDados() {
-            localStorage.setItem('escola_turmas', JSON.stringify(turmas));
-            localStorage.setItem('escola_alunos', JSON.stringify(alunos));
-            renderizarTudo();
+    function renderSearchStudent() {
+      const term = (document.getElementById('inp-search-student')?.value || '').toLowerCase().trim();
+      const container = document.getElementById('search-results');
+
+      if (!term) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Digite algo acima para pesquisar.</p>';
+        return;
+      }
+
+      const results = state.students.filter(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        const nameMatch = (s.name || '').toLowerCase().includes(term);
+        const codeMatch = (s.code || '').toLowerCase().includes(term);
+        const classMatch = cls ? (cls.name || '').toLowerCase().includes(term) : false;
+        const schoolCodeMatch = cls ? (cls.code || '').toLowerCase().includes(term) : false;
+
+        return nameMatch || codeMatch || classMatch || schoolCodeMatch;
+      });
+
+      if (results.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno ou turma encontrado.</p>';
+        return;
+      }
+
+      container.innerHTML = results.map(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        return `
+          <div class="p-3 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+            <div>
+              <span class="font-bold text-slate-800 text-sm">${escapeHTML(s.name)}</span>
+              ${s.code ? `<span class="ml-1 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Cód: ${escapeHTML(s.code)}</span>` : ''}
+              <p class="text-slate-500 mt-0.5">Turma: <b>${escapeHTML(cls ? cls.name : 'Sem Turma')}</b> | Prof: <b>${escapeHTML(cls ? cls.teacher : '-')}</b></p>
+              <p class="text-slate-400 text-[11px]">Resp: ${escapeHTML(s.parent || 'Não inf.')} (${escapeHTML(s.phone || '-')})</p>
+            </div>
+            <button onclick="openEditStudentModal('${s.id}', '${s.classId}')" class="bg-blue-50 text-blue-600 px-3 py-1 rounded font-semibold hover:bg-blue-100">Editar ✏️</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- MODAL DE EDIÇÃO DO ALUNO ---
+    function openEditStudentModal(studentId, classId) {
+      const student = state.students.find(s => s.id === studentId);
+      if (!student) return;
+
+      document.getElementById('edit-stu-id').value = student.id;
+      document.getElementById('edit-stu-class-id').value = classId;
+      document.getElementById('edit-stu-code').value = student.code || '';
+      document.getElementById('edit-stu-name').value = student.name || '';
+      document.getElementById('edit-stu-parent').value = student.parent || '';
+      document.getElementById('edit-stu-phone').value = student.phone || '';
+
+      document.getElementById('edit-student-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-student-modal').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-student').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const studentId = document.getElementById('edit-stu-id').value;
+      const classId = document.getElementById('edit-stu-class-id').value;
+
+      const student = state.students.find(s => s.id === studentId);
+      if (student) {
+        student.code = document.getElementById('edit-stu-code').value.trim();
+        student.name = document.getElementById('edit-stu-name').value.trim();
+        student.parent = document.getElementById('edit-stu-parent').value.trim();
+        student.phone = document.getElementById('edit-stu-phone').value.trim();
+
+        saveState();
+        showToast('Dados do aluno atualizados!');
+        closeEditModal();
+        if (classId) openClassDetails(classId);
+        renderAll();
+      }
+    });
+
+    function transferStudent(studentId, targetClassId) {
+      if (!targetClassId) return;
+      const s = state.students.find(x => x.id === studentId);
+      if (s) { s.classId = targetClassId; saveState(); showToast('Aluno transferido!'); renderAll(); }
+    }
+
+    function deleteStudent(studentId, currentClassId) {
+      if (confirm('Tem certeza de que deseja excluir este aluno?')) {
+        state.students = state.students.filter(s => s.id !== studentId);
+        saveState();
+        openClassDetails(currentClassId);
+        renderClasses();
+      }
+    }
+
+    // --- ABA CHAMADA ---
+    document.getElementById('sel-class-chamada').addEventListener('change', renderChamada);
+    document.getElementById('inp-chamada-date').addEventListener('change', renderChamada);
+
+    function renderChamada() {
+      const classId = document.getElementById('sel-class-chamada').value;
+      const date = document.getElementById('inp-chamada-date').value;
+      const container = document.getElementById('chamada-list');
+
+      if (!classId || !date) { container.innerHTML = ''; return; }
+
+      const students = state.students.filter(s => s.classId === classId);
+      if (students.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Sem alunos nesta turma.</p>';
+        return;
+      }
+
+      container.innerHTML = students.map(s => {
+        const key = `${s.id}_${date}`;
+        const rec = state.attendance[key] || { status: 'p', task: 'f' };
+
+        return `
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2" data-student-id="${s.id}">
+            <span class="font-medium text-slate-800 text-xs">${escapeHTML(s.name)}</span>
+            <div class="flex flex-wrap gap-3">
+              <div class="flex gap-1 status-group">
+                <button type="button" class="btn-toggle st-p ${rec.status === 'p' ? 'active' : ''}" data-val="p">Presente</button>
+                <button type="button" class="btn-toggle st-a ${rec.status === 'a' ? 'active' : ''}" data-val="a">Atraso</button>
+                <button type="button" class="btn-toggle st-f ${rec.status === 'f' ? 'active' : ''}" data-val="f">Falta</button>
+              </div>
+              <div class="flex gap-1 task-group">
+                <button type="button" class="btn-toggle tk-f ${rec.task === 'f' ? 'active' : ''}" data-val="f">Feito</button>
+                <button type="button" class="btn-toggle tk-a ${rec.task === 'a' ? 'active' : ''}" data-val="a">Atrasado</button>
+                <button type="button" class="btn-toggle tk-n ${rec.task === 'n' ? 'active' : ''}" data-val="n">Não Feito</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.onclick = (e) => {
+        const btn = e.target.closest('.btn-toggle');
+        if (!btn) return;
+        const group = btn.closest('div');
+        group.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const row = btn.closest('[data-student-id]');
+        if (row) {
+          const sId = row.dataset.studentId;
+          const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
+          const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
+          state.attendance[`${sId}_${date}`] = { status, task };
+          saveState();
         }
+      };
+    }
 
-        // Alternar entre Abas
-        function switchTab(tabName) {
-            document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('btn-save-chamada').addEventListener('click', () => {
+      const date = document.getElementById('inp-chamada-date').value;
+      if (!date) return;
 
-            document.getElementById(`section-${tabName}`).classList.remove('hidden');
-            document.getElementById(`tab-${tabName}`).classList.add('active');
+      document.querySelectorAll('#chamada-list [data-student-id]').forEach(row => {
+        const sId = row.dataset.studentId;
+        const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
+        const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
+        state.attendance[`${sId}_${date}`] = { status, task };
+      });
+
+      saveState();
+      showToast('Registro de chamada salvo!');
+    });
+
+    // --- ABA AGENDA & FERIADOS ---
+    document.getElementById('form-create-agenda').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('agenda-date').value;
+      const description = document.getElementById('agenda-desc').value.trim();
+      const type = document.getElementById('agenda-type').value;
+
+      state.agenda.push({ id: genId(), date, description, type });
+      saveState();
+      showToast('Evento / Feriado adicionado!');
+      e.target.reset();
+      renderAgenda();
+    });
+
+    function renderAgenda() {
+      const container = document.getElementById('agenda-list');
+      if (state.agenda.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum evento ou feriado cadastrado.</p>';
+        return;
+      }
+
+      container.innerHTML = state.agenda.map(item => `
+        <div class="p-3 bg-white rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+          <div>
+            <span class="font-bold text-slate-800">${escapeHTML(item.description)}</span>
+            <span class="ml-2 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">${item.date}</span>
+          </div>
+          <button onclick="deleteAgendaItem('${item.id}')" class="text-red-500 text-xs hover:underline">Excluir</button>
+        </div>
+      `).join('');
+    }
+
+    function deleteAgendaItem(id) {
+      state.agenda = state.agenda.filter(a => a.id !== id);
+      saveState();
+      renderAgenda();
+    }
+
+    // --- RELATÓRIO COMPLETO ---
+    document.getElementById('sel-class-report').addEventListener('change', renderRelatorio);
+
+    function renderRelatorio() {
+      const classId = document.getElementById('sel-class-report').value;
+      const container = document.getElementById('report-content');
+      if (!classId) { container.innerHTML = ''; return; }
+
+      const students = state.students.filter(s => s.classId === classId);
+
+      let html = `
+        <table class="w-full text-left text-xs bg-white rounded-lg border border-slate-200">
+          <thead class="bg-slate-100 font-semibold text-slate-600 border-b">
+            <tr>
+              <th class="p-2">Aluno</th>
+              <th class="p-2 text-center text-emerald-700 bg-emerald-50">Presença</th>
+              <th class="p-2 text-center text-amber-700 bg-amber-50">Atraso</th>
+              <th class="p-2 text-center text-red-700 bg-red-50">Falta</th>
+              <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
+              <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
+              <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+      `;
+
+      students.forEach(s => {
+        const records = Object.keys(state.attendance)
+          .filter(k => k.startsWith(`${s.id}_`))
+          .map(k => state.attendance[k]);
+
+        const p = records.filter(r => r.status === 'p').length;
+        const a = records.filter(r => r.status === 'a').length;
+        const f = records.filter(r => r.status === 'f').length;
+
+        const tf = records.filter(r => r.task === 'f').length;
+        const ta = records.filter(r => r.task === 'a').length;
+        const tn = records.filter(r => r.task === 'n').length;
+
+        html += `
+          <tr>
+            <td class="p-2 font-medium">${escapeHTML(s.name)}</td>
+            <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/50">${p}</td>
+            <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/50">${a}</td>
+            <td class="p-2 text-center font-bold text-red-600 bg-red-50/50">${f}</td>
+            <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/50">${tf}</td>
+            <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/50">${ta}</td>
+            <td class="p-2 text-center font-bold text-red-600 bg-red-50/50">${tn}</td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = html + '</tbody></table>';
+    }
+
+    // --- ABA GESTÃO COM NOTAS E STATUS ---
+    function renderGestao() {
+      const container = document.getElementById('gestao-content');
+      const holidayDates = new Set((state.agenda || []).map(a => a.date));
+      const teacherFilter = getSelectedTeacher();
+      const alerts = [];
+
+      state.students.forEach(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        if (!cls) return;
+
+        if (teacherFilter && cls.teacher !== teacherFilter) return;
+
+        const dates = Object.keys(state.attendance)
+          .filter(k => k.startsWith(`${s.id}_`))
+          .map(k => k.split('_')[1])
+          .sort();
+
+        let consecutiveHours = 0;
+        const hourCost = cls.freq === '1x2h' ? 2 : 1;
+
+        for (const date of dates) {
+          if (holidayDates.has(date)) continue;
+
+          const rec = state.attendance[`${s.id}_${date}`];
+          if (rec.status === 'f') {
+            consecutiveHours += hourCost;
+          } else if (rec.status === 'p' || rec.status === 'a') {
+            consecutiveHours = 0;
+          }
+
+          if (consecutiveHours >= 2) {
+            alerts.push({ student: s, cls, hours: consecutiveHours });
+            break;
+          }
         }
+      });
 
-        // Renderização Geral
-        function renderizarTudo() {
-            atualizarEstatisticas();
-            renderizarSelectsTurmas();
-            renderizarListaTurmas();
-            renderizarTabelaAlunos();
-            filtrarPesquisaGlobal();
+      if (alerts.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno com excesso de faltas encontrado para esta seleção.</p>';
+        return;
+      }
+
+      container.innerHTML = alerts.map(a => {
+        const noteData = state.managementNotes[a.student.id] || { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+        const isResolved = noteData.status === 'resolvido';
+
+        return `
+          <div class="bg-white p-3 rounded-lg border ${isResolved ? 'border-emerald-200 bg-emerald-50/20' : 'border-red-200'} space-y-2">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
+              <div>
+                <span class="font-bold text-slate-800 text-xs">${escapeHTML(a.student.name)}</span>
+                <span class="ml-2 bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${a.hours}h de falta acumulada</span>
+                <p class="text-[11px] text-slate-500">Turma: <b>${escapeHTML(a.cls.name)}</b> | Prof: <b>${escapeHTML(a.cls.teacher)}</b> | Resp: <b>${escapeHTML(a.student.parent || 'Não inf.')}</b> (${escapeHTML(a.student.phone || '-')})</p>
+              </div>
+              
+              <div class="flex items-center gap-1">
+                <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${!isResolved ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
+                <button onclick="setGestaoStatus('${a.student.id}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? 'bg-emerald-600 border-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Resolvido</button>
+              </div>
+            </div>
+
+            ${isResolved && noteData.resolvedAt ? `<p class="text-[10px] text-emerald-600 font-medium">✓ Resolvido em: ${noteData.resolvedAt}</p>` : ''}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota do Professor:</label>
+                <textarea onchange="saveGestaoNote('${a.student.id}', 'teacherNote', this.value)" placeholder="Escreva observações do professor..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.teacherNote)}</textarea>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota da Secretaria:</label>
+                <textarea onchange="saveGestaoNote('${a.student.id}', 'secNote', this.value)" placeholder="Escreva observações da secretaria..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.secNote)}</textarea>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setGestaoStatus(studentId, status) {
+      if (!state.managementNotes[studentId]) {
+        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+      }
+      
+      state.managementNotes[studentId].status = status;
+      if (status === 'resolvido') {
+        const now = new Date();
+        state.managementNotes[studentId].resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      } else {
+        state.managementNotes[studentId].resolvedAt = '';
+      }
+
+      saveState();
+      renderGestao();
+      showToast(status === 'resolvido' ? 'Marcado como Resolvido!' : 'Marcado como Aguardando.');
+    }
+
+    function saveGestaoNote(studentId, field, value) {
+      if (!state.managementNotes[studentId]) {
+        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+      }
+      state.managementNotes[studentId][field] = value;
+      saveState();
+      showToast('Anotação salva!');
+    }
+
+    // --- BACKUP ---
+    document.getElementById('btn-export-backup')?.addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+      const anchor = document.createElement('a');
+      anchor.setAttribute("href", dataStr);
+      anchor.setAttribute("download", `cci_backup_${new Date().toISOString().split('T')[0]}.json`);
+      anchor.click();
+    });
+
+    document.getElementById('inp-import-backup')?.addEventListener('change', (e) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          state = JSON.parse(event.target.result);
+          saveState();
+          showToast('Backup restaurado!');
+          renderAll();
+        } catch (err) {
+          alert('Arquivo de backup inválido.');
         }
+      };
+      if (e.target.files[0]) reader.readAsText(e.target.files[0]);
+    });
 
-        function atualizarEstatisticas() {
-            document.getElementById('stat-total-alunos').innerText = alunos.length;
-            document.getElementById('stat-total-turmas').innerText = turmas.length;
-        }
+    // --- POVOAR SELECTS DE TURMA RESPEITANDO O FILTRO DO PROFESSOR ---
+    function populateClassSelects() {
+      const filteredClasses = getFilteredClasses();
+      const currentChamadaVal = document.getElementById('sel-class-chamada').value;
+      const currentReportVal = document.getElementById('sel-class-report').value;
 
-        // Preencher Selects de Turma no formulário de alunos
-        function renderizarSelectsTurmas() {
-            const selectCad = document.getElementById('aluno-turma-select');
-            const selectEdit = document.getElementById('edit-aluno-turma-select');
-            
-            let options = turmas.map(t => `<option value="${t.id}">${t.nome} (${t.turno})</option>`).join('');
-            if (turmas.length === 0) {
-                options = '<option value="">Nenhuma turma cadastrada</option>';
-            }
+      const options = '<option value="">Selecione uma turma...</option>' + 
+        filteredClasses.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (Prof. ${escapeHTML(c.teacher)})</option>`).join('');
 
-            selectCad.innerHTML = options;
-            selectEdit.innerHTML = options;
-        }
+      document.getElementById('sel-class-chamada').innerHTML = options;
+      document.getElementById('sel-class-report').innerHTML = options;
 
-        // ================= TURMAS =================
-        function salvarNovaTurma(e) {
-            e.preventDefault();
-            const novaTurma = {
-                id: Date.now().toString(),
-                nome: document.getElementById('turma-nome').value.trim(),
-                serie: document.getElementById('turma-serie').value.trim(),
-                turno: document.getElementById('turma-turno').value,
-                professor: document.getElementById('turma-professor').value.trim(),
-                sala: document.getElementById('turma-sala').value.trim()
-            };
+      if (filteredClasses.some(c => c.id === currentChamadaVal)) document.getElementById('sel-class-chamada').value = currentChamadaVal;
+      if (filteredClasses.some(c => c.id === currentReportVal)) document.getElementById('sel-class-report').value = currentReportVal;
+    }
 
-            turmas.push(novaTurma);
-            persistirDados();
-            document.getElementById('form-cadastrar-turma').reset();
-            alert('Turma cadastrada com sucesso!');
-        }
+    function renderTeacherFilter() {
+      const currentTeacher = getSelectedTeacher();
+      const teachers = [...new Set(state.classes.map(c => c.teacher))];
+      
+      document.getElementById('sel-filter-teacher').innerHTML = '<option value="">Todos os professores</option>' + 
+        teachers.map(t => `<option value="${escapeHTML(t)}"${t === currentTeacher ? ' selected' : ''}>${escapeHTML(t)}</option>`).join('');
+    }
 
-        function renderizarListaTurmas() {
-            const container = document.getElementById('container-lista-turmas');
-            if (turmas.length === 0) {
-                container.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-400 bg-white rounded-2xl border">Nenhuma turma cadastrada.</div>`;
-                return;
-            }
+    function renderAll() {
+      renderTeacherFilter();
+      populateClassSelects();
+      renderClasses();
+      renderChamada();
+      renderAgenda();
+      renderRelatorio();
+      renderGestao();
+      renderSearchStudent();
+    }
 
-            container.innerHTML = turmas.map(t => {
-                const totalAlunosTurma = alunos.filter(a => a.turmaId === t.id).length;
-                return `
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-3 relative hover:shadow-md transition-all">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h3 class="font-bold text-slate-800 text-lg">${t.nome}</h3>
-                                <p class="text-xs text-indigo-600 font-semibold">${t.serie} • ${t.turno}</p>
-                            </div>
-                            <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                                ${totalAlunosTurma} aluno(s)
-                            </span>
-                        </div>
-                        <div class="text-xs text-slate-500 space-y-1 border-t border-slate-100 pt-2">
-                            <p><i class="fa-solid fa-user-tie w-4 text-slate-400"></i> ${t.professor}</p>
-                            <p><i class="fa-solid fa-location-dot w-4 text-slate-400"></i> ${t.sala || 'Sala não informada'}</p>
-                        </div>
-                        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                            <button onclick="abrirModalEditarTurma('${t.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all">
-                                <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Editar
-                            </button>
-                            <button onclick="excluirTurma('${t.id}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all">
-                                <i class="fa-solid fa-trash"></i> Excluir
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function abrirModalEditarTurma(id) {
-            const t = turmas.find(item => item.id === id);
-            if (!t) return;
-
-            document.getElementById('edit-turma-id').value = t.id;
-            document.getElementById('edit-turma-nome').value = t.nome;
-            document.getElementById('edit-turma-serie').value = t.serie;
-            document.getElementById('edit-turma-turno').value = t.turno;
-            document.getElementById('edit-turma-professor').value = t.professor;
-            document.getElementById('edit-turma-sala').value = t.sala;
-
-            document.getElementById('modal-editar-turma').classList.remove('hidden');
-        }
-
-        function fecharModalTurma() {
-            document.getElementById('modal-editar-turma').classList.add('hidden');
-        }
-
-        function salvarEdicaoTurma(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-turma-id').value;
-            const index = turmas.findIndex(t => t.id === id);
-
-            if (index !== -1) {
-                turmas[index] = {
-                    id,
-                    nome: document.getElementById('edit-turma-nome').value.trim(),
-                    serie: document.getElementById('edit-turma-serie').value.trim(),
-                    turno: document.getElementById('edit-turma-turno').value,
-                    professor: document.getElementById('edit-turma-professor').value.trim(),
-                    sala: document.getElementById('edit-turma-sala').value.trim()
-                };
-                persistirDados();
-                fecharModalTurma();
-                alert('Informações da turma atualizadas!');
-            }
-        }
-
-        function excluirTurma(id) {
-            const alunosNaTurma = alunos.filter(a => a.turmaId === id);
-            if (alunosNaTurma.length > 0) {
-                if (!confirm(`Atenção: Existem ${alunosNaTurma.length} aluno(s) vinculados a esta turma. Deseja realmente excluí-la?`)) {
-                    return;
-                }
-            } else if (!confirm('Deseja excluir esta turma?')) {
-                return;
-            }
-
-            turmas = turmas.filter(t => t.id !== id);
-            persistirDados();
-        }
-
-        // ================= ALUNOS =================
-        function salvarNovoAluno(e) {
-            e.preventDefault();
-            if (turmas.length === 0) {
-                alert('Cadastre pelo menos uma turma antes de adicionar alunos!');
-                return;
-            }
-
-            const novoAluno = {
-                id: Date.now().toString(),
-                nome: document.getElementById('aluno-nome').value.trim(),
-                codigo: document.getElementById('aluno-codigo').value.trim(),
-                turmaId: document.getElementById('aluno-turma-select').value,
-                responsavel: document.getElementById('aluno-responsavel').value.trim(),
-                telefone: document.getElementById('aluno-telefone').value.trim()
-            };
-
-            alunos.push(novoAluno);
-            persistirDados();
-            document.getElementById('form-cadastrar-aluno').reset();
-            alert('Aluno cadastrado com sucesso!');
-        }
-
-        function renderizarTabelaAlunos() {
-            const tbody = document.getElementById('tabela-alunos-body');
-            if (alunos.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">Nenhum aluno cadastrado.</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = alunos.map(a => {
-                const turmaObj = turmas.find(t => t.id === a.turmaId);
-                const nomeTurma = turmaObj ? turmaObj.nome : 'Sem Turma';
-
-                return `
-                    <tr class="hover:bg-slate-50 transition-all">
-                        <td class="px-4 py-3 font-mono text-xs font-semibold text-slate-500">${a.codigo}</td>
-                        <td class="px-4 py-3 font-semibold text-slate-800">${a.nome}</td>
-                        <td class="px-4 py-3"><span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-md font-medium">${nomeTurma}</span></td>
-                        <td class="px-4 py-3 text-xs text-slate-600">
-                            <div>${a.responsavel}</div>
-                            <div class="text-slate-400">${a.telefone}</div>
-                        </td>
-                        <td class="px-4 py-3 text-right space-x-1">
-                            <button onclick="abrirModalEditarAluno('${a.id}')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar Aluno">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
-                            <button onclick="excluirAluno('${a.id}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Excluir Aluno">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function abrirModalEditarAluno(id) {
-            const a = alunos.find(item => item.id === id);
-            if (!a) return;
-
-            document.getElementById('edit-aluno-id').value = a.id;
-            document.getElementById('edit-aluno-nome').value = a.nome;
-            document.getElementById('edit-aluno-codigo').value = a.codigo;
-            document.getElementById('edit-aluno-turma-select').value = a.turmaId;
-            document.getElementById('edit-aluno-responsavel').value = a.responsavel;
-            document.getElementById('edit-aluno-telefone').value = a.telefone;
-
-            document.getElementById('modal-editar-aluno').classList.remove('hidden');
-        }
-
-        function fecharModalAluno() {
-            document.getElementById('modal-editar-aluno').classList.add('hidden');
-        }
-
-        function salvarEdicaoAluno(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-aluno-id').value;
-            const index = alunos.findIndex(a => a.id === id);
-
-            if (index !== -1) {
-                alunos[index] = {
-                    id,
-                    nome: document.getElementById('edit-aluno-nome').value.trim(),
-                    codigo: document.getElementById('edit-aluno-codigo').value.trim(),
-                    turmaId: document.getElementById('edit-aluno-turma-select').value,
-                    responsavel: document.getElementById('edit-aluno-responsavel').value.trim(),
-                    telefone: document.getElementById('edit-aluno-telefone').value.trim()
-                };
-                persistirDados();
-                fecharModalAluno();
-                alert('Dados do aluno atualizados!');
-            }
-        }
-
-        function excluirAluno(id) {
-            if (confirm('Deseja realmente remover este aluno?')) {
-                alunos = alunos.filter(a => a.id !== id);
-                persistirDados();
-            }
-        }
-
-        // ================= PESQUISA GLOBAL =================
-        function filtrarPesquisaGlobal() {
-            const termo = document.getElementById('global-search-input').value.toLowerCase().trim();
-            const container = document.getElementById('container-resultados-busca');
-
-            const resultados = alunos.filter(a => {
-                const turmaObj = turmas.find(t => t.id === a.turmaId);
-                const nomeTurma = turmaObj ? turmaObj.nome.toLowerCase() : '';
-                const profTurma = turmaObj ? turmaObj.professor.toLowerCase() : '';
-
-                return a.nome.toLowerCase().includes(termo) ||
-                       a.codigo.toLowerCase().includes(termo) ||
-                       nomeTurma.includes(termo) ||
-                       profTurma.includes(termo) ||
-                       a.responsavel.toLowerCase().includes(termo);
-            });
-
-            document.getElementById('count-resultados').innerText = resultados.length;
-
-            if (resultados.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full bg-white p-8 rounded-2xl border text-center text-slate-400">
-                        <i class="fa-solid fa-user-slash text-3xl mb-2 text-slate-300"></i>
-                        <p>Nenhum aluno encontrado para "${termo}".</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = resultados.map(a => {
-                const turmaObj = turmas.find(t => t.id === a.turmaId);
-                const nomeTurma = turmaObj ? turmaObj.nome : 'Sem Turma';
-                const profTurma = turmaObj ? turmaObj.professor : 'Não informado';
-
-                return `
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-3 hover:shadow-md transition-all">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="bg-slate-100 text-slate-600 font-mono text-xs px-2 py-0.5 rounded font-semibold">${a.codigo}</span>
-                                <h4 class="font-bold text-slate-800 text-base mt-1">${a.nome}</h4>
-                            </div>
-                            <span class="bg-indigo-100 text-indigo-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                                ${nomeTurma}
-                            </span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1.5 border-t border-slate-100 pt-2.5">
-                            <p><i class="fa-solid fa-user-tie w-4 text-slate-400"></i> Prof: ${profTurma}</p>
-                            <p><i class="fa-solid fa-user-shield w-4 text-slate-400"></i> Resp: ${a.responsavel}</p>
-                            <p><i class="fa-solid fa-phone w-4 text-slate-400"></i> ${a.telefone}</p>
-                        </div>
-                        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                            <button onclick="abrirModalEditarAluno('${a.id}')" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all">
-                                <i class="fa-solid fa-pen-to-square"></i> Editar Aluno
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function limparBusca() {
-            document.getElementById('global-search-input').value = '';
-            filtrarPesquisaGlobal();
-        }
-
-        // Inicializar
-        renderizarTudo();
-    </script>
+    // Checar login ao abrir
+    checkAuth();
+  </script>
 </body>
 </html>
