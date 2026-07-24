@@ -256,9 +256,10 @@
 
       <!-- ABA RELATORIO -->
       <section id="tab-relatorio" class="hidden space-y-4">
-        <div>
-          <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
-          <select id="sel-class-report" class="w-full border rounded-lg p-2 text-xs"></select>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+          <label class="block text-xs font-bold text-slate-700">Selecione a Turma para o Relatório</label>
+          <select id="sel-class-report" class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-blue-400"></select>
+          <p class="text-[11px] text-slate-500">Os dados são organizados semana a semana. Você pode visualizar os totais e <b>excluir registros individuais</b> de qualquer data registrada.</p>
         </div>
         <div id="report-content" class="space-y-6"></div>
       </section>
@@ -791,7 +792,34 @@
       renderAgenda();
     }
 
-    // --- RELATÓRIO SEPARADO POR SEMANA ---
+    // --- FUNÇÕES PARA APAGAR REGISTROS INDIVIDUAIS NO RELATÓRIO ---
+    function deleteAttendanceRecord(studentId, dateStr, studentName) {
+      const formattedDate = dateStr.split('-').reverse().join('/');
+      if (confirm(`Tem certeza de que deseja apagar o registro do dia ${formattedDate} para ${studentName || 'este aluno'}?`)) {
+        const key = `${studentId}_${dateStr}`;
+        if (state.attendance[key]) {
+          delete state.attendance[key];
+          saveState();
+          showToast(`Registro do dia ${formattedDate} apagado!`);
+          renderAll();
+        }
+      }
+    }
+
+    function deleteEntireClassDateRecord(classId, dateStr) {
+      const formattedDate = dateStr.split('-').reverse().join('/');
+      if (confirm(`⚠️ Tem certeza de que deseja APAGAR OS REGISTROS DE TODOS OS ALUNOS da turma no dia ${formattedDate}?`)) {
+        const students = state.students.filter(s => s.classId === classId);
+        students.forEach(s => {
+          delete state.attendance[`${s.id}_${dateStr}`];
+        });
+        saveState();
+        showToast(`Registros de ${formattedDate} apagados com sucesso!`);
+        renderAll();
+      }
+    }
+
+    // --- RELATÓRIO SEPARADO POR SEMANA COM OPÇÃO DE APAGAR REGISTROS ---
     document.getElementById('sel-class-report').addEventListener('change', renderRelatorio);
 
     function renderRelatorio() {
@@ -820,15 +848,22 @@
           if (!weeksMap[weekInfo.key]) {
             weeksMap[weekInfo.key] = {
               label: weekInfo.label,
+              dates: new Set(),
               recordsByStudent: {}
             };
           }
+
+          weeksMap[weekInfo.key].dates.add(dateStr);
 
           if (!weeksMap[weekInfo.key].recordsByStudent[studentId]) {
             weeksMap[weekInfo.key].recordsByStudent[studentId] = [];
           }
 
-          weeksMap[weekInfo.key].recordsByStudent[studentId].push(state.attendance[key]);
+          weeksMap[weekInfo.key].recordsByStudent[studentId].push({
+            dateStr: dateStr,
+            status: state.attendance[key].status,
+            task: state.attendance[key].task
+          });
         }
       });
 
@@ -841,26 +876,40 @@
 
       let html = '';
 
+      const statusLabels = { p: 'Presente', a: 'Atraso', f: 'Falta' };
+      const statusColors = { p: 'text-emerald-700 bg-emerald-100', a: 'text-amber-700 bg-amber-100', f: 'text-red-700 bg-red-100' };
+
       sortedWeekKeys.forEach(weekKey => {
         const week = weeksMap[weekKey];
+        const sortedDates = Array.from(week.dates).sort();
 
         html += `
-          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden space-y-2">
-            <div class="bg-slate-800 text-white px-4 py-2 flex justify-between items-center">
-              <span class="font-bold text-xs">${escapeHTML(week.label)}</span>
-              <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">Resumo Semanal</span>
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden space-y-2 shadow-sm">
+            <div class="bg-slate-800 text-white px-4 py-2.5 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <div>
+                <span class="font-bold text-xs sm:text-sm">🗓️ ${escapeHTML(week.label)}</span>
+              </div>
+              <div class="flex flex-wrap gap-1 items-center text-[10px]">
+                <span class="text-slate-300 mr-1">Apagar dia inteiro:</span>
+                ${sortedDates.map(d => {
+                  const fmtD = d.split('-').reverse().slice(0,2).join('/');
+                  return `<button onclick="deleteEntireClassDateRecord('${classId}', '${d}')" class="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-2 py-0.5 rounded border border-red-400/30 transition" title="Apagar todos os registros do dia ${fmtD}">🗑️ Dia ${fmtD}</button>`;
+                }).join('')}
+              </div>
             </div>
+
             <div class="overflow-x-auto p-2">
               <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 font-semibold text-slate-600 border-b">
                   <tr>
-                    <th class="p-2">Aluno</th>
+                    <th class="p-2 min-w-[120px]">Aluno</th>
                     <th class="p-2 text-center text-emerald-700 bg-emerald-50">Presença</th>
                     <th class="p-2 text-center text-amber-700 bg-amber-50">Atraso</th>
                     <th class="p-2 text-center text-red-700 bg-red-50">Falta</th>
                     <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
                     <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
                     <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
+                    <th class="p-2 min-w-[200px]">Datas / Apagar Registro</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -877,15 +926,32 @@
           const ta = records.filter(r => r.task === 'a').length;
           const tn = records.filter(r => r.task === 'n').length;
 
+          const datesBadges = records.length > 0 ? records.map(r => {
+            const fmtDate = r.dateStr.split('-').reverse().slice(0, 2).join('/');
+            const col = statusColors[r.status] || 'bg-slate-100 text-slate-700';
+            const st = statusLabels[r.status] || 'P';
+            return `
+              <span class="inline-flex items-center gap-1.5 ${col} px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200/60">
+                <span><b>${fmtDate}</b> (${st})</span>
+                <button onclick="deleteAttendanceRecord('${s.id}', '${r.dateStr}', '${escapeHTML(s.name)}')" class="text-red-500 hover:text-red-700 hover:bg-red-200/50 rounded-full px-1 font-bold transition" title="Excluir este registro especificamente">✕</button>
+              </span>
+            `;
+          }).join(' ') : '<span class="text-slate-400 text-[10px] italic">Sem chamadas salvas</span>';
+
           html += `
             <tr>
-              <td class="p-2 font-medium">${escapeHTML(s.name)}</td>
-              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${p}</td>
-              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${a}</td>
-              <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${f}</td>
-              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${tf}</td>
-              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${ta}</td>
-              <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${tn}</td>
+              <td class="p-2 font-medium text-slate-800">${escapeHTML(s.name)}</td>
+              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/30">${p}</td>
+              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/30">${a}</td>
+              <td class="p-2 text-center font-bold text-red-600 bg-red-50/30">${f}</td>
+              <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/30">${tf}</td>
+              <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/30">${ta}</td>
+              <td class="p-2 text-center font-bold text-red-600 bg-red-50/30">${tn}</td>
+              <td class="p-2">
+                <div class="flex flex-wrap gap-1">
+                  ${datesBadges}
+                </div>
+              </td>
             </tr>
           `;
         });
