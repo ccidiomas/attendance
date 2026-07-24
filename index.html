@@ -483,7 +483,11 @@
       const section = document.getElementById('class-details-section');
       section.classList.remove('hidden');
       const students = state.students.filter(s => s.classId === classId);
-      const otherClasses = state.classes.filter(c => c.id !== classId);
+      
+      // Ordena as outras turmas em ordem alfabética para o dropdown de transferência
+      const otherClasses = state.classes
+        .filter(c => c.id !== classId)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
 
       section.innerHTML = `
         <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
@@ -514,9 +518,9 @@
                     <td class="p-1.5 font-medium">${escapeHTML(s.name)} ${s.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(s.code)})</span>` : ''}</td>
                     <td class="p-1.5">${escapeHTML(s.parent || '-')}<br><span class="text-slate-400">${escapeHTML(s.phone || '')}</span></td>
                     <td class="p-1.5">
-                      <select onchange="transferStudent('${s.id}', this.value)" class="border text-[11px] p-1 rounded">
+                      <select onchange="transferStudent('${s.id}', this.value)" class="border text-[11px] p-1 rounded max-w-[180px]">
                         <option value="">Mover...</option>
-                        ${otherClasses.map(oc => `<option value="${oc.id}">${escapeHTML(oc.name)}</option>`).join('')}
+                        ${otherClasses.map(oc => `<option value="${oc.id}">${escapeHTML(oc.name)} (Prof. ${escapeHTML(oc.teacher || '-')})</option>`).join('')}
                       </select>
                     </td>
                     <td class="p-1.5 space-x-1">
