@@ -501,10 +501,20 @@ ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agenda ENABLE ROW LEVEL SECURITY;
 ALTER TABLE management_notes ENABLE ROW LEVEL SECURITY;
 
+-- Remover políticas pré-existentes se houver, antes de recriar
+DROP POLICY IF EXISTS "Acesso total classes" ON classes;
 CREATE POLICY "Acesso total classes" ON classes FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total students" ON students;
 CREATE POLICY "Acesso total students" ON students FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total attendance" ON attendance;
 CREATE POLICY "Acesso total attendance" ON attendance FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total agenda" ON agenda;
 CREATE POLICY "Acesso total agenda" ON agenda FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total management_notes" ON management_notes;
 CREATE POLICY "Acesso total management_notes" ON management_notes FOR ALL USING (true) WITH CHECK (true);
 `;
 
