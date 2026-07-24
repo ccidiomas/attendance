@@ -49,6 +49,40 @@
     </div>
   </div>
 
+  <!-- MODAL DE EDIÇÃO DE ALUNO -->
+  <div id="edit-student-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Editar Informações do Aluno</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+      <form id="form-edit-student" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-stu-id">
+        <input type="hidden" id="edit-stu-class-id">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Código:</label>
+          <input id="edit-stu-code" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome do Aluno *:</label>
+          <input id="edit-stu-name" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Responsável:</label>
+          <input id="edit-stu-parent" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Telefone:</label>
+          <input id="edit-stu-phone" type="tel" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+          <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- CONTEÚDO PRINCIPAL DO SITE (OCULTO ATÉ O LOGIN) -->
   <div id="app-content" class="hidden">
     <header class="relative overflow-hidden">
@@ -364,12 +398,17 @@
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-100 text-[10px] text-slate-500 uppercase">
-                <tr><th class="p-1.5">Nome</th><th class="p-1.5">Responsável</th><th class="p-1.5">Transferir</th><th class="p-1.5">Ação</th></tr>
+                <tr>
+                  <th class="p-1.5">Nome</th>
+                  <th class="p-1.5">Responsável</th>
+                  <th class="p-1.5">Transferir</th>
+                  <th class="p-1.5">Ações</th>
+                </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 ${students.map(s => `
                   <tr>
-                    <td class="p-1.5 font-medium">${escapeHTML(s.name)}</td>
+                    <td class="p-1.5 font-medium">${escapeHTML(s.name)} ${s.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(s.code)})</span>` : ''}</td>
                     <td class="p-1.5">${escapeHTML(s.parent || '-')}<br><span class="text-slate-400">${escapeHTML(s.phone || '')}</span></td>
                     <td class="p-1.5">
                       <select onchange="transferStudent('${s.id}', this.value)" class="border text-[11px] p-1 rounded">
@@ -377,7 +416,10 @@
                         ${otherClasses.map(oc => `<option value="${oc.id}">${escapeHTML(oc.name)}</option>`).join('')}
                       </select>
                     </td>
-                    <td class="p-1.5"><button onclick="deleteStudent('${s.id}', '${cls.id}')" class="text-red-500 hover:underline">Excluir</button></td>
+                    <td class="p-1.5 space-x-1">
+                      <button onclick="openEditStudentModal('${s.id}', '${cls.id}')" class="text-blue-600 hover:underline">Editar ✏️</button>
+                      <button onclick="deleteStudent('${s.id}', '${cls.id}')" class="text-red-500 hover:underline">Excluir</button>
+                    </td>
                   </tr>
                 `).join('') || '<tr><td colspan="4" class="p-2 text-center text-slate-400">Nenhum aluno.</td></tr>'}
               </tbody>
@@ -403,6 +445,45 @@
       };
     }
 
+    // --- MODAL DE EDIÇÃO DO ALUNO ---
+    function openEditStudentModal(studentId, classId) {
+      const student = state.students.find(s => s.id === studentId);
+      if (!student) return;
+
+      document.getElementById('edit-stu-id').value = student.id;
+      document.getElementById('edit-stu-class-id').value = classId;
+      document.getElementById('edit-stu-code').value = student.code || '';
+      document.getElementById('edit-stu-name').value = student.name || '';
+      document.getElementById('edit-stu-parent').value = student.parent || '';
+      document.getElementById('edit-stu-phone').value = student.phone || '';
+
+      document.getElementById('edit-student-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-student-modal').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-student').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const studentId = document.getElementById('edit-stu-id').value;
+      const classId = document.getElementById('edit-stu-class-id').value;
+
+      const student = state.students.find(s => s.id === studentId);
+      if (student) {
+        student.code = document.getElementById('edit-stu-code').value.trim();
+        student.name = document.getElementById('edit-stu-name').value.trim();
+        student.parent = document.getElementById('edit-stu-parent').value.trim();
+        student.phone = document.getElementById('edit-stu-phone').value.trim();
+
+        saveState();
+        showToast('Dados do aluno atualizados!');
+        closeEditModal();
+        openClassDetails(classId);
+        renderAll();
+      }
+    });
+
     function transferStudent(studentId, targetClassId) {
       if (!targetClassId) return;
       const s = state.students.find(x => x.id === studentId);
@@ -410,10 +491,12 @@
     }
 
     function deleteStudent(studentId, currentClassId) {
-      state.students = state.students.filter(s => s.id !== studentId);
-      saveState();
-      openClassDetails(currentClassId);
-      renderClasses();
+      if (confirm('Tem certeza de que deseja excluir este aluno?')) {
+        state.students = state.students.filter(s => s.id !== studentId);
+        saveState();
+        openClassDetails(currentClassId);
+        renderClasses();
+      }
     }
 
     // --- ABA CHAMADA ---
