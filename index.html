@@ -88,9 +88,12 @@
             <label><input type="checkbox" value="Sábado"> Sab</label>
           </div>
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="closeEditClassModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
-          <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+        <div class="flex justify-between items-center gap-2 pt-2">
+          <button type="button" onclick="deleteClass()" class="px-3 py-1.5 rounded bg-red-50 text-red-600 border border-red-200 font-medium hover:bg-red-100">Excluir Turma</button>
+          <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeEditClassModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+            <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+          </div>
         </div>
       </form>
     </div>
@@ -707,14 +710,19 @@
     function saveAttendanceRecord(studentId, date, status, task) {
       const key = `${studentId}_${date}`;
       const existingRecord = state.attendance[key] || {};
-      state.attendance[key] = { id: existingRecord.id || null, status, task };
+      const record = { id: existingRecord.id || null, status, task };
+      state.attendance[key] = record;
       saveCachedState();
 
       return enqueueSupabaseWrite(async () => {
-        const attendanceId = await persistAttendanceRow(key, state.attendance[key]);
-        state.attendance[key].id = attendanceId;
-        lastSyncedState.attendance[key] = { id: attendanceId, status, task };
-        saveCachedState();
+        const attendanceId = await persistAttendanceRow(key, record);
+
+        // The record may have been removed while this queued write was waiting.
+        if (state.attendance[key] === record) {
+          state.attendance[key].id = attendanceId;
+          lastSyncedState.attendance[key] = { id: attendanceId, status, task };
+          saveCachedState();
+        }
       });
     }
 
@@ -936,6 +944,78 @@
       }
     });
 
+    function deleteClass() {
+      const classId = document.getElementById('edit-cls-id').value;
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
+
+      const classStudents = state.students.filter(s => s.classId === classId);
+      const studentIds = classStudents.map(s => s.id);
+      const studentIdSet = new Set(studentIds);
+      const attendanceCount = Object.keys(state.attendance).filter(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        return studentIdSet.has(studentId);
+      }).length;
+
+      const warning = classStudents.length > 0
+        ? `Excluir a turma "${cls.name}" também removerá ${classStudents.length} aluno(s), ${attendanceCount} registro(s) de chamada e as notas de gestão relacionadas. Deseja continuar?`
+        : `Tem certeza de que deseja excluir a turma "${cls.name}"?`;
+
+      if (!confirm(warning)) return;
+
+      state.classes = state.classes.filter(c => c.id !== classId);
+      state.students = state.students.filter(s => s.classId !== classId);
+
+      Object.keys(state.attendance).forEach(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        if (studentIdSet.has(studentId)) delete state.attendance[key];
+      });
+
+      studentIds.forEach(studentId => delete state.managementNotes[studentId]);
+
+      saveCachedState();
+      closeEditClassModal();
+      document.getElementById('class-details-section').classList.add('hidden');
+      renderAll();
+      showToast('Turma excluída com sucesso!');
+
+      enqueueSupabaseWrite(async () => {
+        const client = getSupabaseClient();
+
+        for (let i = 0; i < studentIds.length; i += 200) {
+          const batch = studentIds.slice(i, i + 200);
+
+          const { error: attendanceError } = await client
+            .from('attendance')
+            .delete()
+            .in('student_id', batch);
+          if (attendanceError) throw attendanceError;
+
+          const { error: notesError } = await client
+            .from('management_notes')
+            .delete()
+            .in('student_id', batch);
+          if (notesError) throw notesError;
+
+          const { error: studentsError } = await client
+            .from('students')
+            .delete()
+            .in('id', batch);
+          if (studentsError) throw studentsError;
+        }
+
+        const { error: classError } = await client
+          .from('classes')
+          .delete()
+          .eq('id', classId);
+        if (classError) throw classError;
+
+        lastSyncedState = cloneState(state);
+      });
+    }
+
     function openClassDetails(classId) {
       const cls = state.classes.find(c => c.id === classId);
       if (!cls) return;
@@ -1146,6 +1226,7 @@
                 <button type="button" class="btn-toggle tk-f ${rec.task === 'f' ? 'active' : ''}" data-val="f">Feito</button>
                 <button type="button" class="btn-toggle tk-a ${rec.task === 'a' ? 'active' : ''}" data-val="a">Atrasado</button>
                 <button type="button" class="btn-toggle tk-n ${rec.task === 'n' ? 'active' : ''}" data-val="n">Não Feito</button>
+                <button type="button" class="btn-toggle bg-slate-200 text-slate-700 ${rec.task === 's' ? 'active border-slate-600 font-bold' : ''}" data-val="s">Sem Tarefa</button>
               </div>
             </div>
           </div>
@@ -1156,8 +1237,12 @@
         const btn = e.target.closest('.btn-toggle');
         if (!btn) return;
         const group = btn.closest('div');
-        group.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.btn-toggle').forEach(b => {
+          b.classList.remove('active');
+          if (b.dataset.val === 's') b.classList.remove('border-slate-600', 'font-bold');
+        });
         btn.classList.add('active');
+        if (btn.dataset.val === 's') btn.classList.add('border-slate-600', 'font-bold');
 
         const row = btn.closest('[data-student-id]');
         if (row) {
@@ -1275,9 +1360,12 @@
 
         html += `
           <div class="bg-white rounded-xl border border-slate-200 overflow-hidden space-y-2">
-            <div class="bg-slate-800 text-white px-4 py-2 flex justify-between items-center">
+            <div class="bg-slate-800 text-white px-4 py-2 flex justify-between items-center gap-2">
               <span class="font-bold text-xs">${escapeHTML(week.label)}</span>
-              <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">Resumo Semanal</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="deleteWeeklyReport('${classId}', '${weekKey}')" class="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded font-semibold">Excluir relatório</button>
+                <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">Resumo Semanal</span>
+              </div>
             </div>
             <div class="overflow-x-auto p-2">
               <table class="w-full text-left text-xs">
@@ -1290,6 +1378,7 @@
                     <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
                     <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
                     <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
+                    <th class="p-2 text-center text-slate-700 bg-slate-100">Sem Tarefa</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -1305,6 +1394,7 @@
           const tf = records.filter(r => r.task === 'f').length;
           const ta = records.filter(r => r.task === 'a').length;
           const tn = records.filter(r => r.task === 'n').length;
+          const ts = records.filter(r => r.task === 's').length;
 
           html += `
             <tr>
@@ -1315,6 +1405,7 @@
               <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${tf}</td>
               <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${ta}</td>
               <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${tn}</td>
+              <td class="p-2 text-center font-bold text-slate-600 bg-slate-50">${ts}</td>
             </tr>
           `;
         });
@@ -1328,6 +1419,54 @@
       });
 
       container.innerHTML = html;
+    }
+
+    function getWeekEndDate(weekKey) {
+      const [year, month, day] = weekKey.split('-').map(Number);
+      const endDate = new Date(year, month - 1, day);
+      endDate.setDate(endDate.getDate() + 6);
+      return `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    }
+
+    function deleteWeeklyReport(classId, weekKey) {
+      const cls = state.classes.find(c => c.id === classId);
+      const studentIds = state.students.filter(s => s.classId === classId).map(s => s.id);
+      const studentIdSet = new Set(studentIds);
+      const keysToDelete = Object.keys(state.attendance).filter(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+        return studentIdSet.has(studentId) && date && getWeekRange(date).key === weekKey;
+      });
+
+      if (!keysToDelete.length) return;
+
+      const weekLabel = getWeekRange(weekKey).label;
+      const className = cls?.name || 'esta turma';
+      if (!confirm(`Excluir todos os ${keysToDelete.length} registro(s) de chamada de ${className} em ${weekLabel}? Esta ação não pode ser desfeita.`)) return;
+
+      keysToDelete.forEach(key => delete state.attendance[key]);
+      saveCachedState();
+      renderAll();
+      showToast('Relatório e registros de chamada excluídos!');
+
+      const weekEnd = getWeekEndDate(weekKey);
+      enqueueSupabaseWrite(async () => {
+        const client = getSupabaseClient();
+
+        for (let i = 0; i < studentIds.length; i += 200) {
+          const batch = studentIds.slice(i, i + 200);
+          const { error } = await client
+            .from('attendance')
+            .delete()
+            .in('student_id', batch)
+            .gte('date', weekKey)
+            .lte('date', weekEnd);
+          if (error) throw error;
+        }
+
+        lastSyncedState = cloneState(state);
+      });
     }
 
     // --- ABA GESTÃO COM NOTAS E STATUS ---
