@@ -533,9 +533,33 @@
       }
     }
 
-    function createAttendanceId() {
-      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-      return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    function generateUuid() {
+      if (window.crypto?.randomUUID) {
+        return window.crypto.randomUUID();
+      }
+
+      if (window.crypto?.getRandomValues) {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0'));
+        return [
+          hex.slice(0, 4).join(''),
+          hex.slice(4, 6).join(''),
+          hex.slice(6, 8).join(''),
+          hex.slice(8, 10).join(''),
+          hex.slice(10, 16).join('')
+        ].join('-');
+      }
+
+      // Last-resort UUID v4-compatible fallback for older browsers.
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+        const random = Math.floor(Math.random() * 16);
+        const value = char === 'x' ? random : (random & 0x3) | 0x8;
+        return value.toString(16);
+      });
     }
 
     async function persistAttendanceRow(key, record) {
@@ -572,7 +596,7 @@
       } else {
         // The live attendance table requires an explicit id and has no database default.
         // Generate it before the first insert so saving creates exactly one request/row.
-        const newAttendanceId = createAttendanceId();
+        const newAttendanceId = generateUuid();
         const { data, error } = await client
           .from('attendance')
           .insert({ id: newAttendanceId, ...payload })
@@ -753,7 +777,7 @@
     }
 
     // --- UTILS DE DATA E FORMATO ---
-    const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const genId = generateUuid;
     const escapeHTML = str => (str || '').replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag]));
 
     function showToast(msg) {
