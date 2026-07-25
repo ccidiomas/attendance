@@ -423,7 +423,7 @@
         attendance: Object.entries(value.attendance).map(([key, record]) => {
           const separatorIndex = key.lastIndexOf('_');
           return {
-            key,
+            id: record.id || null,
             student_id: separatorIndex >= 0 ? key.slice(0, separatorIndex) : '',
             date: separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '',
             status: record.status || 'p',
@@ -479,7 +479,12 @@
 
       const attendance = {};
       attendanceRows.forEach(record => {
-        attendance[record.key] = { status: record.status || 'p', task: record.task || 'f' };
+        const key = `${record.student_id}_${record.date}`;
+        attendance[key] = {
+          id: record.id,
+          status: record.status || 'p',
+          task: record.task || 'f'
+        };
       });
 
       const managementNotes = {};
@@ -528,13 +533,79 @@
       }
     }
 
+    function createAttendanceId() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    async function persistAttendanceRow(key, record) {
+      const client = getSupabaseClient();
+      const separatorIndex = key.lastIndexOf('_');
+      const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+      const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+      const payload = {
+        student_id: studentId,
+        date,
+        status: record.status || 'p',
+        task: record.task || 'f'
+      };
+
+      let attendanceId = record.id || null;
+
+      if (!attendanceId) {
+        const { data: existingRows, error: findError } = await client
+          .from('attendance')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('date', date)
+          .limit(1);
+        if (findError) throw findError;
+        attendanceId = existingRows?.[0]?.id || null;
+      }
+
+      if (attendanceId) {
+        const { error } = await client
+          .from('attendance')
+          .update(payload)
+          .eq('id', attendanceId);
+        if (error) throw error;
+      } else {
+        let result = await client
+          .from('attendance')
+          .insert(payload)
+          .select('id')
+          .single();
+
+        // If the id column has no database default, generate a UUID-compatible value.
+        if (result.error && /null value.*id|violates not-null constraint/i.test(result.error.message || '')) {
+          result = await client
+            .from('attendance')
+            .insert({ id: createAttendanceId(), ...payload })
+            .select('id')
+            .single();
+        }
+
+        if (result.error) throw result.error;
+        attendanceId = result.data.id;
+      }
+
+      record.id = attendanceId;
+      return attendanceId;
+    }
+
+    async function upsertAttendanceState(value) {
+      for (const [key, record] of Object.entries(value.attendance || {})) {
+        await persistAttendanceRow(key, record);
+      }
+    }
+
     async function upsertStateToSupabase(value) {
       if (!getSupabaseClient()) return;
 
       const rows = stateToRows(value);
       await upsertRows('classes', rows.classes, 'id');
       await upsertRows('students', rows.students, 'id');
-      await upsertRows('attendance', rows.attendance, 'key');
+      await upsertAttendanceState(value);
       await upsertRows('agenda', rows.agenda, 'id');
       await upsertRows('management_notes', rows.management_notes, 'student_id');
     }
@@ -586,19 +657,18 @@
       const changes = [
         { table: 'classes', primaryKey: 'id', ...getTableChanges(previousRows.classes, currentRows.classes, 'id') },
         { table: 'students', primaryKey: 'id', ...getTableChanges(previousRows.students, currentRows.students, 'id') },
-        { table: 'attendance', primaryKey: 'key', ...getTableChanges(previousRows.attendance, currentRows.attendance, 'key') },
         { table: 'agenda', primaryKey: 'id', ...getTableChanges(previousRows.agenda, currentRows.agenda, 'id') },
         { table: 'management_notes', primaryKey: 'student_id', ...getTableChanges(previousRows.management_notes, currentRows.management_notes, 'student_id') }
       ];
 
       // Excluir dependências primeiro, caso chaves estrangeiras sejam adicionadas futuramente.
-      for (const tableName of ['management_notes', 'attendance', 'students', 'agenda', 'classes']) {
+      for (const tableName of ['management_notes', 'students', 'agenda', 'classes']) {
         const change = changes.find(item => item.table === tableName);
         if (change.deletes.length) await deleteRows(change.table, change.primaryKey, change.deletes);
       }
 
       // Inserir/atualizar pais antes dos registros dependentes.
-      for (const tableName of ['classes', 'students', 'attendance', 'agenda', 'management_notes']) {
+      for (const tableName of ['classes', 'students', 'agenda', 'management_notes']) {
         const change = changes.find(item => item.table === tableName);
         if (!change.upserts.length) continue;
         await upsertRows(change.table, change.upserts, change.primaryKey);
@@ -618,20 +688,15 @@
 
     function saveAttendanceRecord(studentId, date, status, task) {
       const key = `${studentId}_${date}`;
-      state.attendance[key] = { status, task };
+      const existingRecord = state.attendance[key] || {};
+      state.attendance[key] = { id: existingRecord.id || null, status, task };
       saveCachedState();
 
       return enqueueSupabaseWrite(async () => {
-        const client = getSupabaseClient();
-        const { error } = await client.from('attendance').upsert({
-          key,
-          student_id: studentId,
-          date,
-          status,
-          task
-        }, { onConflict: 'key' });
-        if (error) throw error;
-        lastSyncedState.attendance[key] = { status, task };
+        const attendanceId = await persistAttendanceRow(key, state.attendance[key]);
+        state.attendance[key].id = attendanceId;
+        lastSyncedState.attendance[key] = { id: attendanceId, status, task };
+        saveCachedState();
       });
     }
 
@@ -650,7 +715,7 @@
       if (!getSupabaseClient()) return;
 
       await clearRemoteTable('management_notes', 'student_id');
-      await clearRemoteTable('attendance', 'key');
+      await clearRemoteTable('attendance', 'id');
       await clearRemoteTable('students', 'id');
       await clearRemoteTable('classes', 'id');
       await clearRemoteTable('agenda', 'id');
