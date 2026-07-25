@@ -570,23 +570,17 @@
           .eq('id', attendanceId);
         if (error) throw error;
       } else {
-        let result = await client
+        // The live attendance table requires an explicit id and has no database default.
+        // Generate it before the first insert so saving creates exactly one request/row.
+        const newAttendanceId = createAttendanceId();
+        const { data, error } = await client
           .from('attendance')
-          .insert(payload)
+          .insert({ id: newAttendanceId, ...payload })
           .select('id')
           .single();
 
-        // If the id column has no database default, generate a UUID-compatible value.
-        if (result.error && /null value.*id|violates not-null constraint/i.test(result.error.message || '')) {
-          result = await client
-            .from('attendance')
-            .insert({ id: createAttendanceId(), ...payload })
-            .select('id')
-            .single();
-        }
-
-        if (result.error) throw result.error;
-        attendanceId = result.data.id;
+        if (error) throw error;
+        attendanceId = data?.id || newAttendanceId;
       }
 
       record.id = attendanceId;
