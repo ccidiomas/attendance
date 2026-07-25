@@ -516,6 +516,7 @@
       section.classList.remove('hidden');
       const students = state.students.filter(s => s.classId === classId);
       
+      // Ordenação alfabética das outras turmas para o dropdown de transferência
       const otherClasses = state.classes
         .filter(c => c.id !== classId)
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
