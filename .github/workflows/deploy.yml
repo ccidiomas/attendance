@@ -1,8 +1,8 @@
-name: Deploy to GitHub Pages with Env Injection
+name: Deploy to GitHub Pages with Supabase Config
 
 on:
   push:
-    branches: ["main"] # Change to your default branch name if different
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -20,19 +20,50 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Inject Environment Variables into HTML
+      - name: Inject Supabase configuration into HTML
         env:
-          # Pull values from GitHub Repository Secrets or Variables
           DB_KEY: ${{ secrets.DB_KEY || vars.DB_KEY }}
           SUPABASE_CONFIG_KEY: ${{ secrets.SUPABASE_CONFIG_KEY || vars.SUPABASE_CONFIG_KEY }}
         run: |
-          # Use sed to replace the placeholders in your index.html
-          sed -i "s|__DB_KEY__|$DB_KEY|g" index.html
-          sed -i "s|__SUPABASE_CONFIG_KEY__|$SUPABASE_CONFIG|g" index.html
+          if [ -z "$DB_KEY" ]; then
+            echo "DB_KEY is not configured."
+            exit 1
+          fi
+
+          if [ -z "$SUPABASE_CONFIG_KEY" ]; then
+            echo "SUPABASE_CONFIG_KEY is not configured."
+            exit 1
+          fi
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          html_path = Path("index.html")
+          html = html_path.read_text(encoding="utf-8")
+
+          replacements = {
+              "__DB_KEY__": os.environ["DB_KEY"],
+              "__SUPABASE_CONFIG_KEY__": os.environ["SUPABASE_CONFIG_KEY"],
+          }
+
+          for placeholder, value in replacements.items():
+              if placeholder not in html:
+                  raise SystemExit(f"Placeholder not found in index.html: {placeholder}")
+              html = html.replace(placeholder, value)
+
+          html_path.write_text(html, encoding="utf-8")
+          PY
+
+          if grep -qE '__DB_KEY__|__SUPABASE_CONFIG_KEY__' index.html; then
+            echo "One or more Supabase placeholders were not replaced."
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -40,7 +71,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Uploads the root directory containing the modified index.html
+          path: "."
 
       - name: Deploy to GitHub Pages
         id: deployment
