@@ -527,12 +527,15 @@
             <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(cls.name)} - Alunos</h3>
             <button onclick="document.getElementById('class-details-section').classList.add('hidden')" class="text-xs text-slate-400">Fechar</button>
           </div>
-          <form id="form-add-student" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input id="stu-code" type="text" placeholder="Código" class="border p-1.5 rounded text-xs">
-            <input id="stu-name" type="text" placeholder="Nome *" required class="border p-1.5 rounded text-xs">
-            <input id="stu-parent" type="text" placeholder="Responsável" class="border p-1.5 rounded text-xs">
-            <input id="stu-phone" type="tel" placeholder="Telefone" class="border p-1.5 rounded text-xs">
-            <button type="submit" class="sm:col-span-2 bg-emerald-500 text-white py-1 rounded text-xs font-semibold">Adicionar Aluno</button>
+          <form id="form-add-student" class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+            <span class="block font-bold text-slate-700 text-xs mb-1">Cadastrar Novo Aluno</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input id="stu-code" type="text" placeholder="Código do Aluno" class="border p-2 rounded text-xs bg-white">
+              <input id="stu-name" type="text" placeholder="Nome do Aluno *" required class="border p-2 rounded text-xs bg-white">
+              <input id="stu-parent" type="text" placeholder="Nome do Responsável" class="border p-2 rounded text-xs bg-white">
+              <input id="stu-phone" type="tel" placeholder="Telefone do Responsável" class="border p-2 rounded text-xs bg-white">
+            </div>
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded text-xs font-semibold transition">Adicionar Aluno</button>
           </form>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
