@@ -1,0 +1,47 @@
+name: Deploy to GitHub Pages with Env Injection
+
+on:
+  push:
+    branches: ["main"] # Change to your default branch name if different
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Inject Environment Variables into HTML
+        env:
+          # Pull values from GitHub Repository Secrets or Variables
+          DB_KEY: ${{ secrets.DB_KEY || vars.DB_KEY }}
+          SUPABASE_CONFIG: ${{ secrets.SUPABASE_CONFIG_KEY || vars.SUPABASE_CONFIG_KEY }}
+        run: |
+          # Use sed to replace the placeholders in your index.html
+          sed -i "s|__DB_KEY__|$DB_KEY|g" index.html
+          sed -i "s|__SUPABASE_CONFIG_KEY__|$SUPABASE_CONFIG|g" index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.' # Uploads the root directory containing the modified index.html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
