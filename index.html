@@ -289,16 +289,19 @@
 
   <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs shadow-lg z-50"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     // --- CONTROLE DE SENHA / SISTEMA DE LOGIN ---
     const SYSTEM_PASSWORD = 'cci123'; // <--- SENHA DA ESCOLA AQUI
     const AUTH_KEY = 'cci_app_authenticated';
 
-    function checkAuth() {
+    async function checkAuth() {
       const isAuth = sessionStorage.getItem(AUTH_KEY);
       if (isAuth === 'true') {
         document.getElementById('login-modal').classList.add('hidden');
         document.getElementById('app-content').classList.remove('hidden');
+        await initializeState();
         renderAll();
       } else {
         document.getElementById('login-modal').classList.remove('hidden');
@@ -323,29 +326,370 @@
       checkAuth();
     }
 
-    // --- ESTADO INICIAL ---
-    const DB_KEY = 'cci_app_data_v3';
-    let state = loadState();
+    // --- ESTADO INICIAL / SUPABASE ---
+    const LOCAL_DB_KEY = 'cci_app_data_v3';
+    const SUPABASE_URL = '__SUPABASE_CONFIG_KEY__';
+    const SUPABASE_ANON_KEY = '__DB_KEY__';
 
-    function loadState() {
+    const EMPTY_STATE = () => ({
+      classes: [],
+      students: [],
+      attendance: {},
+      agenda: [],
+      managementNotes: {}
+    });
+
+    let state = loadCachedState();
+    let stateInitialized = false;
+    let supabaseClient = null;
+    let supabaseWriteQueue = Promise.resolve();
+    let lastSyncedState = cloneState(state);
+
+    function normalizeState(data = {}) {
+      return {
+        classes: Array.isArray(data.classes) ? data.classes : [],
+        students: Array.isArray(data.students) ? data.students : [],
+        attendance: data.attendance && typeof data.attendance === 'object' && !Array.isArray(data.attendance) ? data.attendance : {},
+        agenda: Array.isArray(data.agenda) ? data.agenda : [],
+        managementNotes: data.managementNotes && typeof data.managementNotes === 'object' && !Array.isArray(data.managementNotes) ? data.managementNotes : {}
+      };
+    }
+
+    function loadCachedState() {
       try {
-        const raw = localStorage.getItem(DB_KEY);
-        const data = raw ? JSON.parse(raw) : {};
-        return {
-          classes: data.classes || [],
-          students: data.students || [],
-          attendance: data.attendance || {},
-          agenda: data.agenda || [],
-          managementNotes: data.managementNotes || {}
-        };
+        const raw = localStorage.getItem(LOCAL_DB_KEY);
+        return normalizeState(raw ? JSON.parse(raw) : {});
       } catch (e) {
-        console.error("Erro ao carregar banco:", e);
-        return { classes: [], students: [], attendance: {}, agenda: [], managementNotes: {} };
+        console.error('Erro ao carregar cache local:', e);
+        return EMPTY_STATE();
+      }
+    }
+
+    function saveCachedState() {
+      localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(state));
+    }
+
+    function hasSupabaseConfig() {
+      return Boolean(
+        window.supabase?.createClient &&
+        SUPABASE_URL &&
+        SUPABASE_ANON_KEY &&
+        !SUPABASE_URL.includes('__SUPABASE_CONFIG_KEY__') &&
+        !SUPABASE_ANON_KEY.includes('__DB_KEY__')
+      );
+    }
+
+    function getSupabaseClient() {
+      if (!hasSupabaseConfig()) return null;
+      if (!supabaseClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+      }
+      return supabaseClient;
+    }
+
+    function stateHasData(value) {
+      return value.classes.length > 0 ||
+        value.students.length > 0 ||
+        Object.keys(value.attendance).length > 0 ||
+        value.agenda.length > 0 ||
+        Object.keys(value.managementNotes).length > 0;
+    }
+
+    function cloneState(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function stateToRows(value) {
+      return {
+        classes: value.classes.map(c => ({
+          id: c.id,
+          teacher: c.teacher || '',
+          name: c.name || '',
+          freq: c.freq || '',
+          code: c.code || '',
+          weekdays: c.weekdays || []
+        })),
+        students: value.students.map(s => ({
+          id: s.id,
+          class_id: s.classId || null,
+          code: s.code || '',
+          name: s.name || '',
+          parent: s.parent || '',
+          phone: s.phone || ''
+        })),
+        attendance: Object.entries(value.attendance).map(([key, record]) => {
+          const separatorIndex = key.lastIndexOf('_');
+          return {
+            key,
+            student_id: separatorIndex >= 0 ? key.slice(0, separatorIndex) : '',
+            date: separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '',
+            status: record.status || 'p',
+            task: record.task || 'f'
+          };
+        }),
+        agenda: value.agenda.map(item => ({
+          id: item.id,
+          date: item.date || '',
+          description: item.description || '',
+          type: item.type || 'holiday'
+        })),
+        management_notes: Object.entries(value.managementNotes).map(([studentId, note]) => ({
+          student_id: studentId,
+          teacher_note: note.teacherNote || '',
+          sec_note: note.secNote || '',
+          status: note.status || 'aguardando',
+          resolved_at: note.resolvedAt || ''
+        }))
+      };
+    }
+
+    async function selectAllRows(table, columns = '*', orderColumn = null) {
+      const client = getSupabaseClient();
+      const pageSize = 1000;
+      const rows = [];
+
+      for (let from = 0; ; from += pageSize) {
+        let query = client.from(table).select(columns).range(from, from + pageSize - 1);
+        if (orderColumn) query = query.order(orderColumn, { ascending: true });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+
+      return rows;
+    }
+
+    async function loadStateFromSupabase() {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Supabase não configurado.');
+
+      const [classesRows, studentsRows, attendanceRows, agendaRows, notesRows] = await Promise.all([
+        selectAllRows('classes', '*', 'id'),
+        selectAllRows('students', '*', 'id'),
+        selectAllRows('attendance', '*', 'date'),
+        selectAllRows('agenda', '*', 'id'),
+        selectAllRows('management_notes', '*', 'student_id')
+      ]);
+
+      const attendance = {};
+      attendanceRows.forEach(record => {
+        attendance[record.key] = { status: record.status || 'p', task: record.task || 'f' };
+      });
+
+      const managementNotes = {};
+      notesRows.forEach(note => {
+        managementNotes[note.student_id] = {
+          teacherNote: note.teacher_note || '',
+          secNote: note.sec_note || '',
+          status: note.status || 'aguardando',
+          resolvedAt: note.resolved_at || ''
+        };
+      });
+
+      return normalizeState({
+        classes: classesRows.map(c => ({
+          id: c.id,
+          teacher: c.teacher || '',
+          name: c.name || '',
+          freq: c.freq || '',
+          code: c.code || '',
+          weekdays: Array.isArray(c.weekdays) ? c.weekdays : []
+        })),
+        students: studentsRows.map(s => ({
+          id: s.id,
+          classId: s.class_id || '',
+          code: s.code || '',
+          name: s.name || '',
+          parent: s.parent || '',
+          phone: s.phone || ''
+        })),
+        attendance,
+        agenda: agendaRows.map(item => ({
+          id: item.id,
+          date: item.date || '',
+          description: item.description || '',
+          type: item.type || 'holiday'
+        })),
+        managementNotes
+      });
+    }
+
+    async function upsertRows(table, rows, primaryKey) {
+      const client = getSupabaseClient();
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await client.from(table).upsert(rows.slice(i, i + 500), { onConflict: primaryKey });
+        if (error) throw error;
+      }
+    }
+
+    async function upsertStateToSupabase(value) {
+      if (!getSupabaseClient()) return;
+
+      const rows = stateToRows(value);
+      await upsertRows('classes', rows.classes, 'id');
+      await upsertRows('students', rows.students, 'id');
+      await upsertRows('attendance', rows.attendance, 'key');
+      await upsertRows('agenda', rows.agenda, 'id');
+      await upsertRows('management_notes', rows.management_notes, 'student_id');
+    }
+
+    function enqueueSupabaseWrite(operation) {
+      if (!getSupabaseClient()) return Promise.resolve();
+
+      supabaseWriteQueue = supabaseWriteQueue
+        .catch(() => undefined)
+        .then(operation)
+        .catch(error => {
+          console.error('Erro ao salvar no Supabase:', error);
+          showToast('Erro ao sincronizar com o banco. Dados mantidos neste navegador.');
+        });
+
+      return supabaseWriteQueue;
+    }
+
+    function getTableChanges(previousRows, currentRows, primaryKey) {
+      const previousById = new Map(previousRows.map(row => [row[primaryKey], row]));
+      const currentById = new Map(currentRows.map(row => [row[primaryKey], row]));
+
+      const upserts = currentRows.filter(row => {
+        const previous = previousById.get(row[primaryKey]);
+        return !previous || JSON.stringify(previous) !== JSON.stringify(row);
+      });
+
+      const deletes = previousRows
+        .filter(row => !currentById.has(row[primaryKey]))
+        .map(row => row[primaryKey]);
+
+      return { upserts, deletes };
+    }
+
+    async function deleteRows(table, primaryKey, ids) {
+      const client = getSupabaseClient();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error } = await client.from(table).delete().in(primaryKey, ids.slice(i, i + 200));
+        if (error) throw error;
+      }
+    }
+
+    async function syncStateChanges(previousValue, currentValue) {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const previousRows = stateToRows(previousValue);
+      const currentRows = stateToRows(currentValue);
+      const changes = [
+        { table: 'classes', primaryKey: 'id', ...getTableChanges(previousRows.classes, currentRows.classes, 'id') },
+        { table: 'students', primaryKey: 'id', ...getTableChanges(previousRows.students, currentRows.students, 'id') },
+        { table: 'attendance', primaryKey: 'key', ...getTableChanges(previousRows.attendance, currentRows.attendance, 'key') },
+        { table: 'agenda', primaryKey: 'id', ...getTableChanges(previousRows.agenda, currentRows.agenda, 'id') },
+        { table: 'management_notes', primaryKey: 'student_id', ...getTableChanges(previousRows.management_notes, currentRows.management_notes, 'student_id') }
+      ];
+
+      // Excluir dependências primeiro, caso chaves estrangeiras sejam adicionadas futuramente.
+      for (const tableName of ['management_notes', 'attendance', 'students', 'agenda', 'classes']) {
+        const change = changes.find(item => item.table === tableName);
+        if (change.deletes.length) await deleteRows(change.table, change.primaryKey, change.deletes);
+      }
+
+      // Inserir/atualizar pais antes dos registros dependentes.
+      for (const tableName of ['classes', 'students', 'attendance', 'agenda', 'management_notes']) {
+        const change = changes.find(item => item.table === tableName);
+        if (!change.upserts.length) continue;
+        await upsertRows(change.table, change.upserts, change.primaryKey);
       }
     }
 
     function saveState() {
-      localStorage.setItem(DB_KEY, JSON.stringify(state));
+      saveCachedState();
+      const previousSnapshot = cloneState(lastSyncedState);
+      const currentSnapshot = cloneState(state);
+
+      return enqueueSupabaseWrite(async () => {
+        await syncStateChanges(previousSnapshot, currentSnapshot);
+        lastSyncedState = cloneState(currentSnapshot);
+      });
+    }
+
+    function saveAttendanceRecord(studentId, date, status, task) {
+      const key = `${studentId}_${date}`;
+      state.attendance[key] = { status, task };
+      saveCachedState();
+
+      return enqueueSupabaseWrite(async () => {
+        const client = getSupabaseClient();
+        const { error } = await client.from('attendance').upsert({
+          key,
+          student_id: studentId,
+          date,
+          status,
+          task
+        }, { onConflict: 'key' });
+        if (error) throw error;
+        lastSyncedState.attendance[key] = { status, task };
+      });
+    }
+
+    async function clearRemoteTable(table, primaryKey) {
+      const client = getSupabaseClient();
+      const rows = await selectAllRows(table, primaryKey, primaryKey);
+      const ids = rows.map(row => row[primaryKey]);
+
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error: deleteError } = await client.from(table).delete().in(primaryKey, ids.slice(i, i + 200));
+        if (deleteError) throw deleteError;
+      }
+    }
+
+    async function replaceSupabaseState(value) {
+      if (!getSupabaseClient()) return;
+
+      await clearRemoteTable('management_notes', 'student_id');
+      await clearRemoteTable('attendance', 'key');
+      await clearRemoteTable('students', 'id');
+      await clearRemoteTable('classes', 'id');
+      await clearRemoteTable('agenda', 'id');
+      await upsertStateToSupabase(value);
+    }
+
+    async function initializeState() {
+      if (stateInitialized) return;
+      stateInitialized = true;
+
+      const cachedState = loadCachedState();
+      if (!hasSupabaseConfig()) {
+        state = cachedState;
+        lastSyncedState = cloneState(state);
+        console.warn('Supabase não configurado; usando somente o cache local.');
+        showToast('Banco não configurado. Usando dados locais.');
+        return;
+      }
+
+      try {
+        const remoteState = await loadStateFromSupabase();
+
+        // Migração automática: envia os dados antigos do localStorage quando o banco ainda está vazio.
+        if (!stateHasData(remoteState) && stateHasData(cachedState)) {
+          state = cachedState;
+          await upsertStateToSupabase(state);
+          lastSyncedState = cloneState(state);
+          saveCachedState();
+          showToast('Dados locais migrados para o Supabase!');
+        } else {
+          state = remoteState;
+          lastSyncedState = cloneState(state);
+          saveCachedState();
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do Supabase:', error);
+        state = cachedState;
+        lastSyncedState = cloneState(state);
+        showToast('Não foi possível acessar o banco. Usando dados locais.');
+      }
     }
 
     // --- UTILS DE DATA E FORMATO ---
@@ -736,8 +1080,7 @@
           const sId = row.dataset.studentId;
           const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
           const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
-          state.attendance[`${sId}_${date}`] = { status, task };
-          saveState();
+          saveAttendanceRecord(sId, date, status, task);
         }
       };
     }
@@ -750,10 +1093,8 @@
         const sId = row.dataset.studentId;
         const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
         const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
-        state.attendance[`${sId}_${date}`] = { status, task };
+        saveAttendanceRecord(sId, date, status, task);
       });
-
-      saveState();
       showToast('Registro de chamada salvo!');
     });
 
@@ -1022,14 +1363,18 @@
 
     document.getElementById('inp-import-backup')?.addEventListener('change', (e) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
-          state = JSON.parse(event.target.result);
-          saveState();
+          state = normalizeState(JSON.parse(event.target.result));
+          saveCachedState();
+          await supabaseWriteQueue;
+          await replaceSupabaseState(cloneState(state));
+          lastSyncedState = cloneState(state);
           showToast('Backup restaurado!');
           renderAll();
         } catch (err) {
-          alert('Arquivo de backup inválido.');
+          console.error('Erro ao restaurar backup:', err);
+          alert('Arquivo de backup inválido ou erro ao salvar no banco.');
         }
       };
       if (e.target.files[0]) reader.readAsText(e.target.files[0]);
