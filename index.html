@@ -370,12 +370,13 @@
     }
 
     function hasSupabaseConfig() {
+      const hasValidUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL);
+      const hasValidAnonKey = typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20;
+
       return Boolean(
         window.supabase?.createClient &&
-        SUPABASE_URL &&
-        SUPABASE_ANON_KEY &&
-        !SUPABASE_URL.includes('__SUPABASE_CONFIG_KEY__') &&
-        !SUPABASE_ANON_KEY.includes('__DB_KEY__')
+        hasValidUrl &&
+        hasValidAnonKey
       );
     }
 
@@ -1415,7 +1416,7 @@
       renderSearchStudent();
     }
 
-    // Checar login
+    // Checar login ao abrir
     checkAuth();
   </script>
 </body>
