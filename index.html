@@ -1755,7 +1755,7 @@
         container.innerHTML = students
           .map((s) => {
             const key = `${s.id}_${date}`;
-            const rec = state.attendance[key] || { status: "p", task: "f" };
+            const rec = state.attendance[key] || { status: "p", task: "s" };
 
             return `
           <div class="p-2.5 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2" data-student-id="${s.id}">
