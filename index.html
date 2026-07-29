@@ -72,6 +72,7 @@
             <option value="1x2h">1x na semana (2h por aula)</option>
             <option value="2x1h">2x na semana (1h por aula)</option>
             <option value="1x1h">1x na semana (1h por aula)</option>
+            <option value="1x1h30">1x na semana (1h30min por aula)</option>
           </select>
         </div>
         <div>
@@ -193,6 +194,7 @@
               <option value="1x2h">1x na semana (2h por aula)</option>
               <option value="2x1h">2x na semana (1h por aula)</option>
               <option value="1x1h">1x na semana (1h por aula)</option>
+            <option value="1x1h30">1x na semana (1h30min por aula)</option>
             </select>
             <input id="inp-code" type="text" placeholder="Código da Escola (opcional)" class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
           </div>
@@ -1223,6 +1225,7 @@
                 <button type="button" class="btn-toggle st-p ${rec.status === 'p' ? 'active' : ''}" data-val="p">Presente</button>
                 <button type="button" class="btn-toggle st-a ${rec.status === 'a' ? 'active' : ''}" data-val="a">Atraso</button>
                 <button type="button" class="btn-toggle st-f ${rec.status === 'f' ? 'active' : ''}" data-val="f">Falta</button>
+                <button type="button" class="btn-toggle bg-blue-100 text-blue-700 ${rec.status === 'j' ? 'active border-blue-600 font-bold' : ''}" data-val="j">Falta Just.</button>
               </div>
               <div class="flex gap-1 task-group">
                 <button type="button" class="btn-toggle tk-f ${rec.task === 'f' ? 'active' : ''}" data-val="f">Feito</button>
@@ -1242,9 +1245,11 @@
         group.querySelectorAll('.btn-toggle').forEach(b => {
           b.classList.remove('active');
           if (b.dataset.val === 's') b.classList.remove('border-slate-600', 'font-bold');
+          if (b.dataset.val === 'j') b.classList.remove('border-blue-600', 'font-bold');
         });
         btn.classList.add('active');
         if (btn.dataset.val === 's') btn.classList.add('border-slate-600', 'font-bold');
+        if (btn.dataset.val === 'j') btn.classList.add('border-blue-600', 'font-bold');
 
         const row = btn.closest('[data-student-id]');
         if (row) {
@@ -1377,6 +1382,7 @@
                     <th class="p-2 text-center text-emerald-700 bg-emerald-50">Presença</th>
                     <th class="p-2 text-center text-amber-700 bg-amber-50">Atraso</th>
                     <th class="p-2 text-center text-red-700 bg-red-50">Falta</th>
+                    <th class="p-2 text-center text-blue-700 bg-blue-50">Falta Just.</th>
                     <th class="p-2 text-center text-emerald-700 bg-emerald-50">T. Feita</th>
                     <th class="p-2 text-center text-amber-700 bg-amber-50">T. Atrasada</th>
                     <th class="p-2 text-center text-red-700 bg-red-50">T. Não Feita</th>
@@ -1392,6 +1398,7 @@
           const p = records.filter(r => r.status === 'p').length;
           const a = records.filter(r => r.status === 'a').length;
           const f = records.filter(r => r.status === 'f').length;
+          const fj = records.filter(r => r.status === 'j').length;
 
           const tf = records.filter(r => r.task === 'f').length;
           const ta = records.filter(r => r.task === 'a').length;
@@ -1404,6 +1411,7 @@
               <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${p}</td>
               <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${a}</td>
               <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${f}</td>
+              <td class="p-2 text-center font-bold text-blue-600 bg-blue-50/40">${fj}</td>
               <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${tf}</td>
               <td class="p-2 text-center font-bold text-amber-600 bg-amber-50/40">${ta}</td>
               <td class="p-2 text-center font-bold text-red-600 bg-red-50/40">${tn}</td>
@@ -1491,7 +1499,7 @@
 
         let consecutiveAbsences = 0;
         let consecutiveHours = 0;
-        const hourCost = cls.freq === '1x2h' ? 2 : 1;
+        const hourCost = cls.freq === '1x2h' ? 2 : (cls.freq === '1x1h30' ? 1.5 : 1);
         const requiredConsecutiveAbsences = cls.freq === '1x2h' ? 1 : 2;
 
         for (const date of dates) {
@@ -1501,7 +1509,8 @@
           if (rec.status === 'f') {
             consecutiveAbsences += 1;
             consecutiveHours += hourCost;
-          } else if (rec.status === 'p' || rec.status === 'a') {
+          } else {
+            // Presença, atraso e falta justificada interrompem a sequência de faltas não justificadas.
             consecutiveAbsences = 0;
             consecutiveHours = 0;
           }
@@ -1550,13 +1559,15 @@
 
           ${weekGroup.alerts.map(a => {
             const noteData = state.managementNotes[a.student.id] || { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+            const isAwaiting = noteData.status === 'aguardando';
             const isResolved = noteData.status === 'resolvido';
+            const isSent = noteData.status === 'enviado';
             const absenceLabel = a.absences === 1
               ? `${a.hours}h de falta`
               : `${a.absences} faltas consecutivas (${a.hours}h)`;
 
             return `
-              <div class="bg-white p-3 rounded-lg border ${isResolved ? 'border-emerald-200 bg-emerald-50/20' : 'border-red-200'} space-y-2">
+              <div class="bg-white p-3 rounded-lg border ${isResolved ? 'border-emerald-200 bg-emerald-50/20' : (isSent ? 'border-blue-200 bg-blue-50/20' : 'border-red-200')} space-y-2">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
                   <div>
                     <span class="font-bold text-slate-800 text-xs">${escapeHTML(a.student.name)}</span>
@@ -1565,8 +1576,9 @@
                   </div>
                   
                   <div class="flex items-center gap-1">
-                    <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${!isResolved ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
+                    <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isAwaiting ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
                     <button onclick="setGestaoStatus('${a.student.id}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? 'bg-emerald-600 border-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Resolvido</button>
+                    <button onclick="setGestaoStatus('${a.student.id}', 'enviado')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isSent ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Enviado</button>
                   </div>
                 </div>
 
@@ -1604,7 +1616,12 @@
 
       saveState();
       renderGestao();
-      showToast(status === 'resolvido' ? 'Marcado como Resolvido!' : 'Marcado como Aguardando.');
+      const statusMessages = {
+        aguardando: 'Marcado como Aguardando.',
+        resolvido: 'Marcado como Resolvido!',
+        enviado: 'Marcado como Enviado!'
+      };
+      showToast(statusMessages[status] || 'Status atualizado!');
     }
 
     function saveGestaoNote(studentId, field, value) {
