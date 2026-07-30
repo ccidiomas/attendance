@@ -1,1376 +1,903 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Controle de Presença CCI</title>
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      body {
-        font-family: "DM Sans", sans-serif;
-        background-color: #f1f5f9;
-      }
-      .tab-active {
-        border-bottom: 3px solid #60a5fa;
-        color: #60a5fa;
-        font-weight: 600;
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Presença CCI</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'DM Sans', sans-serif; background-color: #f1f5f9; }
+    .tab-active { border-bottom: 3px solid #60a5fa; color: #60a5fa; font-weight: 600; }
+    
+    .btn-toggle { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; border: 2px solid transparent; transition: all 0.15s; cursor: pointer; }
+    
+    /* Presença */
+    .st-p { background: #dcfce7; color: #166534; }
+    .st-p.active { border-color: #166534; font-weight: 700; }
+    .st-a { background: #fef9c3; color: #854d0e; }
+    .st-a.active { border-color: #854d0e; font-weight: 700; }
+    .st-f { background: #fee2e2; color: #991b1b; }
+    .st-f.active { border-color: #991b1b; font-weight: 700; }
 
-      .btn-toggle {
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 500;
-        border: 2px solid transparent;
-        transition: all 0.15s;
-        cursor: pointer;
-      }
+    /* Tarefa */
+    .tk-f { background: #10b981; color: #fff; }
+    .tk-f.active { border-color: #047857; font-weight: 700; }
+    .tk-a { background: #f59e0b; color: #fff; }
+    .tk-a.active { border-color: #b45309; font-weight: 700; }
+    .tk-n { background: #ef4444; color: #fff; }
+    .tk-n.active { border-color: #b91c1c; font-weight: 700; }
+  </style>
+</head>
+<body class="min-h-screen">
 
-      /* Presença */
-      .st-p {
-        background: #dcfce7;
-        color: #166534;
-      }
-      .st-p.active {
-        border-color: #166534;
-        font-weight: 700;
-      }
-      .st-a {
-        background: #fef9c3;
-        color: #854d0e;
-      }
-      .st-a.active {
-        border-color: #854d0e;
-        font-weight: 700;
-      }
-      .st-f {
-        background: #fee2e2;
-        color: #991b1b;
-      }
-      .st-f.active {
-        border-color: #991b1b;
-        font-weight: 700;
-      }
+  <!-- TELA DE LOGIN / PROTEÇÃO POR SENHA -->
+  <div id="login-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full space-y-4 text-center">
+      <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+        🔒
+      </div>
+      <div>
+        <h2 class="text-lg font-bold text-slate-800">Acesso Restrito CCI</h2>
+        <p class="text-xs text-slate-500 mt-1">Digite a senha da escola para acessar o sistema de presença.</p>
+      </div>
+      <form id="form-login" class="space-y-3">
+        <input id="login-password" type="password" placeholder="Digite a senha..." required class="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-center focus:ring-2 focus:ring-blue-400 outline-none">
+        <p id="login-error" class="text-red-500 text-xs hidden">Senha incorreta. Tente novamente.</p>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition">Entrar no Sistema</button>
+      </form>
+    </div>
+  </div>
 
-      /* Tarefa */
-      .tk-f {
-        background: #10b981;
-        color: #fff;
-      }
-      .tk-f.active {
-        border-color: #047857;
-        font-weight: 700;
-      }
-      .tk-a {
-        background: #f59e0b;
-        color: #fff;
-      }
-      .tk-a.active {
-        border-color: #b45309;
-        font-weight: 700;
-      }
-      .tk-n {
-        background: #ef4444;
-        color: #fff;
-      }
-      .tk-n.active {
-        border-color: #b91c1c;
-        font-weight: 700;
-      }
-    </style>
-  </head>
-  <body class="min-h-screen">
-    <!-- TELA DE LOGIN / PROTEÇÃO POR SENHA -->
-    <div
-      id="login-modal"
-      class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-    >
-      <div
-        class="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full space-y-4 text-center"
-      >
-        <div
-          class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold"
-        >
-          🔒
+  <!-- MODAL DE EDIÇÃO DE TURMA -->
+  <div id="edit-class-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Editar Turma</h3>
+        <button onclick="closeEditClassModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+      <form id="form-edit-class" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-cls-id">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome do Professor *:</label>
+          <input id="edit-cls-teacher" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
         </div>
         <div>
-          <h2 class="text-lg font-bold text-slate-800">Acesso Restrito CCI</h2>
-          <p class="text-xs text-slate-500 mt-1">
-            Digite a senha da escola para acessar o sistema de presença.
-          </p>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome da Turma *:</label>
+          <input id="edit-cls-name" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
         </div>
-        <form id="form-login" class="space-y-3">
-          <input
-            id="login-password"
-            type="password"
-            placeholder="Digite a senha..."
-            required
-            class="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-center focus:ring-2 focus:ring-blue-400 outline-none"
-          />
-          <p id="login-error" class="text-red-500 text-xs hidden">
-            Senha incorreta. Tente novamente.
-          </p>
-          <button
-            type="submit"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition"
-          >
-            Entrar no Sistema
-          </button>
-        </form>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Frequência:</label>
+          <select id="edit-cls-freq" class="w-full border p-2 rounded">
+            <option value="1x2h">1x na semana (2h por aula)</option>
+            <option value="2x1h">2x na semana (1h por aula)</option>
+            <option value="1x1h">1x na semana (1h por aula)</option>
+            <option value="1x1h30">1x na semana (1h30min por aula)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Código da Escola:</label>
+          <input id="edit-cls-code" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <span class="block mb-1 font-semibold text-slate-600">Dias da Semana:</span>
+          <div class="flex flex-wrap gap-2" id="edit-weekdays">
+            <label><input type="checkbox" value="Segunda"> Seg</label>
+            <label><input type="checkbox" value="Terça"> Ter</label>
+            <label><input type="checkbox" value="Quarta"> Qua</label>
+            <label><input type="checkbox" value="Quinta"> Qui</label>
+            <label><input type="checkbox" value="Sexta"> Sex</label>
+            <label><input type="checkbox" value="Sábado"> Sab</label>
+          </div>
+        </div>
+        <div class="flex justify-between items-center gap-2 pt-2">
+          <button type="button" onclick="deleteClass()" class="px-3 py-1.5 rounded bg-red-50 text-red-600 border border-red-200 font-medium hover:bg-red-100">Excluir Turma</button>
+          <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeEditClassModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+            <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO DE ALUNO -->
+  <div id="edit-student-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Editar Informações do Aluno</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+      <form id="form-edit-student" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-stu-id">
+        <input type="hidden" id="edit-stu-class-id">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Código do Aluno:</label>
+          <input id="edit-stu-code" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Nome do Aluno *:</label>
+          <input id="edit-stu-name" type="text" required class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Responsável:</label>
+          <input id="edit-stu-parent" type="text" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-0.5">Telefone:</label>
+          <input id="edit-stu-phone" type="tel" class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditModal()" class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium">Cancelar</button>
+          <button type="submit" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL DO SITE (OCULTO ATÉ O LOGIN) -->
+  <div id="app-content" class="hidden">
+    <header class="relative overflow-hidden">
+      <div class="h-44 sm:h-52 flex items-center px-4 sm:px-6" style="background: linear-gradient(135deg, #60a5fa 0%, #f87171 100%);">
+        <div class="max-w-3xl mx-auto w-full flex justify-between items-center">
+          <div>
+            <h1 class="text-white text-2xl sm:text-3xl font-bold drop-shadow">Controle de Presença CCI</h1>
+            <p class="text-white/90 text-xs sm:text-sm mt-1">Gerenciamento Integrado de Turmas, Tarefas e Agenda</p>
+          </div>
+          <button onclick="logout()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg border border-white/40">Sair 🚪</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- FILTROS GLOBAIS -->
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 mt-4 space-y-3">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1">
+          <label class="block mb-1 text-xs font-bold text-slate-700">Filtrar por Professor(a) [Geral]</label>
+          <select id="sel-filter-teacher" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-400 outline-none">
+            <option value="">Todos os professores</option>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block mb-1 text-xs font-bold text-slate-700">Filtrar por Dia (Turmas)</label>
+          <div class="flex flex-wrap gap-2 text-xs" id="weekdays-filter">
+            <label><input type="checkbox" value="Segunda"> Seg</label>
+            <label><input type="checkbox" value="Terça"> Ter</label>
+            <label><input type="checkbox" value="Quarta"> Qua</label>
+            <label><input type="checkbox" value="Quinta"> Qui</label>
+            <label><input type="checkbox" value="Sexta"> Sex</label>
+            <label><input type="checkbox" value="Sábado"> Sab</label>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- MODAL DE EDIÇÃO DE TURMA -->
-    <div
-      id="edit-class-modal"
-      class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden"
-    >
-      <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
-        <div class="flex justify-between items-center border-b pb-2">
-          <h3 class="font-bold text-slate-800 text-sm">Editar Turma</h3>
-          <button
-            onclick="closeEditClassModal()"
-            class="text-slate-400 hover:text-slate-600 text-sm"
-          >
-            ✕
-          </button>
-        </div>
-        <form id="form-edit-class" class="space-y-2.5 text-xs">
-          <input type="hidden" id="edit-cls-id" />
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Nome do Professor *:</label
-            >
-            <input
-              id="edit-cls-teacher"
-              type="text"
-              required
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Nome da Turma *:</label
-            >
-            <input
-              id="edit-cls-name"
-              type="text"
-              required
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Frequência:</label
-            >
-            <select id="edit-cls-freq" class="w-full border p-2 rounded">
+    <nav class="max-w-3xl mx-auto flex border-b border-slate-200 mt-4 px-4 sm:px-0 overflow-x-auto">
+      <button class="tab-btn tab-active px-4 py-2 text-xs sm:text-sm text-slate-600 whitespace-nowrap" data-tab="turmas">Turmas</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="busca">🔍 Buscar Aluno</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="chamada">Chamada</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="agenda">Agenda & Feriados</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="relatorio">Relatório</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="gestao">Gestão</button>
+      <button class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap" data-tab="backup">Backup</button>
+    </nav>
+
+    <main class="max-w-3xl mx-auto p-4 sm:p-6">
+      <!-- ABA TURMAS -->
+      <section id="tab-turmas" class="space-y-4">
+        <form id="form-create-class" class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Criar Nova Turma</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <input id="inp-teacher" type="text" placeholder="Nome do Professor *" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <input id="inp-classname" type="text" placeholder="Nome da Turma *" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <select id="inp-freq" class="border p-2 rounded">
               <option value="1x2h">1x na semana (2h por aula)</option>
               <option value="2x1h">2x na semana (1h por aula)</option>
               <option value="1x1h">1x na semana (1h por aula)</option>
-              <option value="1x1h30">1x na semana (1h30min por aula)</option>
+            <option value="1x1h30">1x na semana (1h30min por aula)</option>
+            </select>
+            <input id="inp-code" type="text" placeholder="Código da Escola (opcional)" class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="text-xs">
+            <span class="block mb-1 font-semibold text-slate-600">Dias da Semana:</span>
+            <div class="flex flex-wrap gap-2" id="create-weekdays">
+              <label><input type="checkbox" value="Segunda"> Seg</label>
+              <label><input type="checkbox" value="Terça"> Ter</label>
+              <label><input type="checkbox" value="Quarta"> Qua</label>
+              <label><input type="checkbox" value="Quinta"> Qui</label>
+              <label><input type="checkbox" value="Sexta"> Sex</label>
+              <label><input type="checkbox" value="Sábado"> Sab</label>
+            </div>
+          </div>
+          <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-600">Criar Turma</button>
+        </form>
+
+        <div id="class-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        <div id="class-details-section" class="hidden mt-4"></div>
+      </section>
+
+      <!-- ABA BUSCAR ALUNO -->
+      <section id="tab-busca" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Pesquisar Aluno</h2>
+          <p class="text-xs text-slate-500">Busque pelo nome do aluno, código individual, código da escola ou nome da turma.</p>
+          <input id="inp-search-student" type="text" placeholder="Digite para pesquisar..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none">
+        </div>
+        <div id="search-results" class="space-y-2"></div>
+      </section>
+
+      <!-- ABA CHAMADA -->
+      <section id="tab-chamada" class="hidden space-y-3">
+        <div class="flex flex-col sm:flex-row gap-2 items-end">
+          <div class="flex-1 w-full">
+            <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
+            <select id="sel-class-chamada" class="w-full border rounded-lg p-2 text-xs"></select>
+          </div>
+          <div class="w-full sm:w-auto">
+            <label class="block mb-1 text-xs font-medium text-slate-700">Data da Aula</label>
+            <input id="inp-chamada-date" type="date" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <button id="btn-save-chamada" class="bg-amber-400 hover:bg-amber-500 text-slate-800 px-4 py-2 rounded-lg text-xs font-bold w-full sm:w-auto">Salvar Registro</button>
+        </div>
+        <div id="chamada-list" class="space-y-2"></div>
+      </section>
+
+      <!-- ABA AGENDA & FERIADOS -->
+      <section id="tab-agenda" class="hidden space-y-4">
+        <form id="form-create-agenda" class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Cadastrar Feriado / Data sem Aula</h2>
+          <p class="text-xs text-slate-500">Dias cadastrados aqui abonam a contagem de faltas automáticas do aluno.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <input id="agenda-date" type="date" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <input id="agenda-desc" type="text" placeholder="Descrição (Ex: Carnaval)" required class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400">
+            <select id="agenda-type" class="border p-2 rounded">
+              <option value="holiday">Feriado / Recesso</option>
+              <option value="event">Evento Escolar</option>
             </select>
           </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Código da Escola:</label
-            >
-            <input
-              id="edit-cls-code"
-              type="text"
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <span class="block mb-1 font-semibold text-slate-600"
-              >Dias da Semana:</span
-            >
-            <div class="flex flex-wrap gap-2" id="edit-weekdays">
-              <label><input type="checkbox" value="Segunda" /> Seg</label>
-              <label><input type="checkbox" value="Terça" /> Ter</label>
-              <label><input type="checkbox" value="Quarta" /> Qua</label>
-              <label><input type="checkbox" value="Quinta" /> Qui</label>
-              <label><input type="checkbox" value="Sexta" /> Sex</label>
-              <label><input type="checkbox" value="Sábado" /> Sab</label>
-            </div>
-          </div>
-          <div class="flex justify-between items-center gap-2 pt-2">
-            <button
-              type="button"
-              onclick="deleteClass()"
-              class="px-3 py-1.5 rounded bg-red-50 text-red-600 border border-red-200 font-medium hover:bg-red-100"
-            >
-              Excluir Turma
-            </button>
-            <div class="flex justify-end gap-2">
-              <button
-                type="button"
-                onclick="closeEditClassModal()"
-                class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-              >
-                Salvar Alterações
-              </button>
-            </div>
-          </div>
+          <button type="submit" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-600">Adicionar Evento</button>
         </form>
-      </div>
-    </div>
 
-    <!-- MODAL DE EDIÇÃO DE ALUNO -->
-    <div
-      id="edit-student-modal"
-      class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden"
-    >
-      <div class="bg-white p-5 rounded-xl shadow-xl max-w-md w-full space-y-3">
-        <div class="flex justify-between items-center border-b pb-2">
-          <h3 class="font-bold text-slate-800 text-sm">
-            Editar Informações do Aluno
-          </h3>
-          <button
-            onclick="closeEditModal()"
-            class="text-slate-400 hover:text-slate-600 text-sm"
-          >
-            ✕
-          </button>
+        <div id="agenda-list" class="space-y-2"></div>
+      </section>
+
+      <!-- ABA RELATORIO -->
+      <section id="tab-relatorio" class="hidden space-y-4">
+        <div>
+          <label class="block mb-1 text-xs font-medium text-slate-700">Selecione a Turma</label>
+          <select id="sel-class-report" class="w-full border rounded-lg p-2 text-xs"></select>
         </div>
-        <form id="form-edit-student" class="space-y-2.5 text-xs">
-          <input type="hidden" id="edit-stu-id" />
-          <input type="hidden" id="edit-stu-class-id" />
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Código do Aluno:</label
-            >
-            <input
-              id="edit-stu-code"
-              type="text"
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Nome do Aluno *:</label
-            >
-            <input
-              id="edit-stu-name"
-              type="text"
-              required
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Responsável:</label
-            >
-            <input
-              id="edit-stu-parent"
-              type="text"
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-600 mb-0.5"
-              >Telefone:</label
-            >
-            <input
-              id="edit-stu-phone"
-              type="tel"
-              class="w-full border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div class="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onclick="closeEditModal()"
-              class="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-            >
-              Salvar Alterações
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div id="report-content" class="space-y-6"></div>
+      </section>
 
-    <!-- CONTEÚDO PRINCIPAL DO SITE (OCULTO ATÉ O LOGIN) -->
-    <div id="app-content" class="hidden">
-      <header class="relative overflow-hidden">
-        <div
-          class="h-44 sm:h-52 flex items-center px-4 sm:px-6"
-          style="background: linear-gradient(135deg, #60a5fa 0%, #f87171 100%)"
-        >
-          <div
-            class="max-w-3xl mx-auto w-full flex justify-between items-center"
-          >
-            <div>
-              <h1 class="text-white text-2xl sm:text-3xl font-bold drop-shadow">
-                Controle de Presença CCI
-              </h1>
-              <p class="text-white/90 text-xs sm:text-sm mt-1">
-                Gerenciamento Integrado de Turmas, Tarefas e Agenda
-              </p>
-            </div>
-            <button
-              onclick="logout()"
-              class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg border border-white/40"
-            >
-              Sair 🚪
-            </button>
+      <!-- ABA GESTAO -->
+      <section id="tab-gestao" class="hidden space-y-3">
+        <h2 class="font-bold text-slate-800 text-sm">Alunos com Excesso de Faltas (≥ 2 Horas)</h2>
+        <p class="text-xs text-slate-500">Faltas em feriados ou eventos da Agenda são abonadas automaticamente.</p>
+        <input id="inp-gestao-search" type="search" placeholder="Buscar aluno por nome..." aria-label="Buscar aluno na gestão" class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none">
+        <div id="gestao-content" class="space-y-3"></div>
+      </section>
+
+      <!-- ABA BACKUP -->
+      <section id="tab-backup" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <h2 class="font-bold text-slate-800 text-sm">Backup e Restauração dos Dados</h2>
+          <p class="text-xs text-slate-500">Exporte seus dados para não perder registros ou importe um arquivo JSON antigo.</p>
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button id="btn-export-backup" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700">⬇️ Baixar Backup (JSON)</button>
+            <label class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-semibold border cursor-pointer text-center hover:bg-slate-200">
+              📂 Restaurar Backup
+              <input type="file" id="inp-import-backup" accept=".json" class="hidden">
+            </label>
           </div>
         </div>
-      </header>
+      </section>
+    </main>
+  </div>
 
-      <!-- FILTROS GLOBAIS -->
-      <div class="max-w-3xl mx-auto px-4 sm:px-6 mt-4 space-y-3">
-        <div class="flex flex-col sm:flex-row gap-3">
-          <div class="flex-1">
-            <label class="block mb-1 text-xs font-bold text-slate-700"
-              >Filtrar por Professor(a) [Geral]</label
-            >
-            <select
-              id="sel-filter-teacher"
-              class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-400 outline-none"
-            >
-              <option value="">Todos os professores</option>
-            </select>
-          </div>
-          <div class="flex-1">
-            <label class="block mb-1 text-xs font-bold text-slate-700"
-              >Filtrar por Dia (Turmas)</label
-            >
-            <div class="flex flex-wrap gap-2 text-xs" id="weekdays-filter">
-              <label><input type="checkbox" value="Segunda" /> Seg</label>
-              <label><input type="checkbox" value="Terça" /> Ter</label>
-              <label><input type="checkbox" value="Quarta" /> Qua</label>
-              <label><input type="checkbox" value="Quinta" /> Qui</label>
-              <label><input type="checkbox" value="Sexta" /> Sex</label>
-              <label><input type="checkbox" value="Sábado" /> Sab</label>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs shadow-lg z-50"></div>
 
-      <nav
-        class="max-w-3xl mx-auto flex border-b border-slate-200 mt-4 px-4 sm:px-0 overflow-x-auto"
-      >
-        <button
-          class="tab-btn tab-active px-4 py-2 text-xs sm:text-sm text-slate-600 whitespace-nowrap"
-          data-tab="turmas"
-        >
-          Turmas
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="busca"
-        >
-          🔍 Buscar Aluno
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="chamada"
-        >
-          Chamada
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="agenda"
-        >
-          Agenda & Feriados
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="relatorio"
-        >
-          Relatório
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="gestao"
-        >
-          Gestão
-        </button>
-        <button
-          class="tab-btn px-4 py-2 text-xs sm:text-sm text-slate-500 whitespace-nowrap"
-          data-tab="backup"
-        >
-          Backup
-        </button>
-      </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-      <main class="max-w-3xl mx-auto p-4 sm:p-6">
-        <!-- ABA TURMAS -->
-        <section id="tab-turmas" class="space-y-4">
-          <form
-            id="form-create-class"
-            class="p-4 rounded-xl bg-white border border-slate-200 space-y-3"
-          >
-            <h2 class="font-bold text-slate-800 text-sm">Criar Nova Turma</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <input
-                id="inp-teacher"
-                type="text"
-                placeholder="Nome do Professor *"
-                required
-                class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                id="inp-classname"
-                type="text"
-                placeholder="Nome da Turma *"
-                required
-                class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <select id="inp-freq" class="border p-2 rounded">
-                <option value="1x2h">1x na semana (2h por aula)</option>
-                <option value="2x1h">2x na semana (1h por aula)</option>
-                <option value="1x1h">1x na semana (1h por aula)</option>
-                <option value="1x1h30">1x na semana (1h30min por aula)</option>
-              </select>
-              <input
-                id="inp-code"
-                type="text"
-                placeholder="Código da Escola (opcional)"
-                class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-              />
-            </div>
-            <div class="text-xs">
-              <span class="block mb-1 font-semibold text-slate-600"
-                >Dias da Semana:</span
-              >
-              <div class="flex flex-wrap gap-2" id="create-weekdays">
-                <label><input type="checkbox" value="Segunda" /> Seg</label>
-                <label><input type="checkbox" value="Terça" /> Ter</label>
-                <label><input type="checkbox" value="Quarta" /> Qua</label>
-                <label><input type="checkbox" value="Quinta" /> Qui</label>
-                <label><input type="checkbox" value="Sexta" /> Sex</label>
-                <label><input type="checkbox" value="Sábado" /> Sab</label>
-              </div>
-            </div>
-            <button
-              type="submit"
-              class="bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-600"
-            >
-              Criar Turma
-            </button>
-          </form>
+  <script>
+    // --- CONTROLE DE SENHA / SISTEMA DE LOGIN ---
+    const SYSTEM_PASSWORD = 'cci123'; // <--- SENHA DA ESCOLA AQUI
+    const AUTH_KEY = 'cci_app_authenticated';
 
-          <div
-            id="class-list"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-          ></div>
-          <div id="class-details-section" class="hidden mt-4"></div>
-        </section>
-
-        <!-- ABA BUSCAR ALUNO -->
-        <section id="tab-busca" class="hidden space-y-4">
-          <div
-            class="bg-white p-4 rounded-xl border border-slate-200 space-y-3"
-          >
-            <h2 class="font-bold text-slate-800 text-sm">Pesquisar Aluno</h2>
-            <p class="text-xs text-slate-500">
-              Busque pelo nome do aluno, código individual, código da escola ou
-              nome da turma.
-            </p>
-            <input
-              id="inp-search-student"
-              type="text"
-              placeholder="Digite para pesquisar..."
-              class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none"
-            />
-          </div>
-          <div id="search-results" class="space-y-2"></div>
-        </section>
-
-        <!-- ABA CHAMADA -->
-        <section id="tab-chamada" class="hidden space-y-3">
-          <div class="flex flex-col sm:flex-row gap-2 items-end">
-            <div class="flex-1 w-full">
-              <label class="block mb-1 text-xs font-medium text-slate-700"
-                >Selecione a Turma</label
-              >
-              <select
-                id="sel-class-chamada"
-                class="w-full border rounded-lg p-2 text-xs"
-              ></select>
-            </div>
-            <div class="w-full sm:w-auto">
-              <label class="block mb-1 text-xs font-medium text-slate-700"
-                >Data da Aula</label
-              >
-              <input
-                id="inp-chamada-date"
-                type="date"
-                class="w-full border rounded-lg p-2 text-xs"
-              />
-            </div>
-            <button
-              id="btn-save-chamada"
-              class="bg-amber-400 hover:bg-amber-500 text-slate-800 px-4 py-2 rounded-lg text-xs font-bold w-full sm:w-auto"
-            >
-              Salvar Registro
-            </button>
-          </div>
-          <div id="chamada-list" class="space-y-2"></div>
-        </section>
-
-        <!-- ABA AGENDA & FERIADOS -->
-        <section id="tab-agenda" class="hidden space-y-4">
-          <form
-            id="form-create-agenda"
-            class="p-4 rounded-xl bg-white border border-slate-200 space-y-3"
-          >
-            <h2 class="font-bold text-slate-800 text-sm">
-              Cadastrar Feriado / Data sem Aula
-            </h2>
-            <p class="text-xs text-slate-500">
-              Dias cadastrados aqui abonam a contagem de faltas automáticas do
-              aluno.
-            </p>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-              <input
-                id="agenda-date"
-                type="date"
-                required
-                class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                id="agenda-desc"
-                type="text"
-                placeholder="Descrição (Ex: Carnaval)"
-                required
-                class="border p-2 rounded outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <select id="agenda-type" class="border p-2 rounded">
-                <option value="holiday">Feriado / Recesso</option>
-                <option value="event">Evento Escolar</option>
-              </select>
-            </div>
-            <button
-              type="submit"
-              class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-600"
-            >
-              Adicionar Evento
-            </button>
-          </form>
-
-          <div id="agenda-list" class="space-y-2"></div>
-        </section>
-
-        <!-- ABA RELATORIO -->
-        <section id="tab-relatorio" class="hidden space-y-4">
-          <div>
-            <label class="block mb-1 text-xs font-medium text-slate-700"
-              >Selecione a Turma</label
-            >
-            <select
-              id="sel-class-report"
-              class="w-full border rounded-lg p-2 text-xs"
-            ></select>
-          </div>
-          <div id="report-content" class="space-y-6"></div>
-        </section>
-
-        <!-- ABA GESTAO -->
-        <section id="tab-gestao" class="hidden space-y-3">
-          <h2 class="font-bold text-slate-800 text-sm">
-            Alunos com Excesso de Faltas (≥ 2 Horas)
-          </h2>
-          <p class="text-xs text-slate-500">
-            Faltas em feriados ou eventos da Agenda são abonadas
-            automaticamente.
-          </p>
-          <div id="gestao-content" class="space-y-3"></div>
-        </section>
-
-        <!-- ABA BACKUP -->
-        <section id="tab-backup" class="hidden space-y-4">
-          <div
-            class="bg-white p-4 rounded-xl border border-slate-200 space-y-3"
-          >
-            <h2 class="font-bold text-slate-800 text-sm">
-              Backup e Restauração dos Dados
-            </h2>
-            <p class="text-xs text-slate-500">
-              Exporte seus dados para não perder registros ou importe um arquivo
-              JSON antigo.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                id="btn-export-backup"
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700"
-              >
-                ⬇️ Baixar Backup (JSON)
-              </button>
-              <label
-                class="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-semibold border cursor-pointer text-center hover:bg-slate-200"
-              >
-                📂 Restaurar Backup
-                <input
-                  type="file"
-                  id="inp-import-backup"
-                  accept=".json"
-                  class="hidden"
-                />
-              </label>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <div
-      id="toast"
-      class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs shadow-lg z-50"
-    ></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script>
-      // --- CONTROLE DE SENHA / SISTEMA DE LOGIN ---
-      const SYSTEM_PASSWORD = "cci123"; // <--- SENHA DA ESCOLA AQUI
-      const AUTH_KEY = "cci_app_authenticated";
-
-      async function checkAuth() {
-        const isAuth = sessionStorage.getItem(AUTH_KEY);
-        if (isAuth === "true") {
-          document.getElementById("login-modal").classList.add("hidden");
-          document.getElementById("app-content").classList.remove("hidden");
-          await initializeState();
-          renderAll();
-        } else {
-          document.getElementById("login-modal").classList.remove("hidden");
-          document.getElementById("app-content").classList.add("hidden");
-        }
+    async function checkAuth() {
+      const isAuth = sessionStorage.getItem(AUTH_KEY);
+      if (isAuth === 'true') {
+        document.getElementById('login-modal').classList.add('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
+        await initializeState();
+        renderAll();
+      } else {
+        document.getElementById('login-modal').classList.remove('hidden');
+        document.getElementById('app-content').classList.add('hidden');
       }
+    }
 
-      document.getElementById("form-login").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const pwd = document.getElementById("login-password").value;
-        if (pwd === SYSTEM_PASSWORD) {
-          sessionStorage.setItem(AUTH_KEY, "true");
-          document.getElementById("login-error").classList.add("hidden");
-          checkAuth();
-        } else {
-          document.getElementById("login-error").classList.remove("hidden");
-        }
-      });
-
-      function logout() {
-        sessionStorage.removeItem(AUTH_KEY);
+    document.getElementById('form-login').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pwd = document.getElementById('login-password').value;
+      if (pwd === SYSTEM_PASSWORD) {
+        sessionStorage.setItem(AUTH_KEY, 'true');
+        document.getElementById('login-error').classList.add('hidden');
         checkAuth();
+      } else {
+        document.getElementById('login-error').classList.remove('hidden');
       }
+    });
 
-      // --- ESTADO INICIAL / SUPABASE ---
-      const LOCAL_DB_KEY = "cci_app_data_v3";
-      const SUPABASE_URL = "__SUPABASE_CONFIG_KEY__";
-      const SUPABASE_ANON_KEY = "__DB_KEY__";
+    function logout() {
+      sessionStorage.removeItem(AUTH_KEY);
+      checkAuth();
+    }
 
-      const EMPTY_STATE = () => ({
-        classes: [],
-        students: [],
-        attendance: {},
-        agenda: [],
-        managementNotes: {},
-      });
+    // --- ESTADO INICIAL / SUPABASE ---
+    const LOCAL_DB_KEY = 'cci_app_data_v3';
+    const SUPABASE_URL = '__SUPABASE_CONFIG_KEY__';
+    const SUPABASE_ANON_KEY = '__DB_KEY__';
 
-      let state = loadCachedState();
-      let stateInitialized = false;
-      let supabaseClient = null;
-      let supabaseWriteQueue = Promise.resolve();
-      let lastSyncedState = cloneState(state);
+    const EMPTY_STATE = () => ({
+      classes: [],
+      students: [],
+      attendance: {},
+      agenda: [],
+      managementNotes: {}
+    });
 
-      function normalizeState(data = {}) {
-        return {
-          classes: Array.isArray(data.classes) ? data.classes : [],
-          students: Array.isArray(data.students) ? data.students : [],
-          attendance:
-            data.attendance &&
-            typeof data.attendance === "object" &&
-            !Array.isArray(data.attendance)
-              ? data.attendance
-              : {},
-          agenda: Array.isArray(data.agenda) ? data.agenda : [],
-          managementNotes:
-            data.managementNotes &&
-            typeof data.managementNotes === "object" &&
-            !Array.isArray(data.managementNotes)
-              ? data.managementNotes
-              : {},
-        };
+    let state = loadCachedState();
+    let stateInitialized = false;
+    let supabaseClient = null;
+    let supabaseWriteQueue = Promise.resolve();
+    let lastSyncedState = cloneState(state);
+    const collapsedGestaoWeeks = new Set();
+
+    function normalizeState(data = {}) {
+      return {
+        classes: Array.isArray(data.classes) ? data.classes : [],
+        students: Array.isArray(data.students) ? data.students : [],
+        attendance: data.attendance && typeof data.attendance === 'object' && !Array.isArray(data.attendance) ? data.attendance : {},
+        agenda: Array.isArray(data.agenda) ? data.agenda : [],
+        managementNotes: data.managementNotes && typeof data.managementNotes === 'object' && !Array.isArray(data.managementNotes) ? data.managementNotes : {}
+      };
+    }
+
+    function loadCachedState() {
+      try {
+        const raw = localStorage.getItem(LOCAL_DB_KEY);
+        return normalizeState(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        console.error('Erro ao carregar cache local:', e);
+        return EMPTY_STATE();
       }
+    }
 
-      function loadCachedState() {
-        try {
-          const raw = localStorage.getItem(LOCAL_DB_KEY);
-          return normalizeState(raw ? JSON.parse(raw) : {});
-        } catch (e) {
-          console.error("Erro ao carregar cache local:", e);
-          return EMPTY_STATE();
-        }
+    function saveCachedState() {
+      localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(state));
+    }
+
+    function hasSupabaseConfig() {
+      const hasValidUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL);
+      const hasValidAnonKey = typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20;
+
+      return Boolean(
+        window.supabase?.createClient &&
+        hasValidUrl &&
+        hasValidAnonKey
+      );
+    }
+
+    function getSupabaseClient() {
+      if (!hasSupabaseConfig()) return null;
+      if (!supabaseClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
       }
+      return supabaseClient;
+    }
 
-      function saveCachedState() {
-        localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(state));
-      }
+    function stateHasData(value) {
+      return value.classes.length > 0 ||
+        value.students.length > 0 ||
+        Object.keys(value.attendance).length > 0 ||
+        value.agenda.length > 0 ||
+        Object.keys(value.managementNotes).length > 0;
+    }
 
-      function hasSupabaseConfig() {
-        const hasValidUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(
-          SUPABASE_URL,
-        );
-        const hasValidAnonKey =
-          typeof SUPABASE_ANON_KEY === "string" &&
-          SUPABASE_ANON_KEY.length > 20;
+    function cloneState(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
 
-        return Boolean(
-          window.supabase?.createClient && hasValidUrl && hasValidAnonKey,
-        );
-      }
-
-      function getSupabaseClient() {
-        if (!hasSupabaseConfig()) return null;
-        if (!supabaseClient) {
-          supabaseClient = window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY,
-            {
-              auth: { persistSession: false, autoRefreshToken: false },
-            },
-          );
-        }
-        return supabaseClient;
-      }
-
-      function stateHasData(value) {
-        return (
-          value.classes.length > 0 ||
-          value.students.length > 0 ||
-          Object.keys(value.attendance).length > 0 ||
-          value.agenda.length > 0 ||
-          Object.keys(value.managementNotes).length > 0
-        );
-      }
-
-      function cloneState(value) {
-        return JSON.parse(JSON.stringify(value));
-      }
-
-      function stateToRows(value) {
-        return {
-          classes: value.classes.map((c) => ({
-            id: c.id,
-            teacher: c.teacher || "",
-            name: c.name || "",
-            freq: c.freq || "",
-            code: c.code || "",
-            weekdays: c.weekdays || [],
-          })),
-          students: value.students.map((s) => ({
-            id: s.id,
-            class_id: s.classId || null,
-            code: s.code || "",
-            name: s.name || "",
-            parent: s.parent || "",
-            phone: s.phone || "",
-          })),
-          attendance: Object.entries(value.attendance).map(([key, record]) => {
-            const separatorIndex = key.lastIndexOf("_");
-            return {
-              id: record.id || null,
-              student_id:
-                separatorIndex >= 0 ? key.slice(0, separatorIndex) : "",
-              date: separatorIndex >= 0 ? key.slice(separatorIndex + 1) : "",
-              status: record.status || "p",
-              task: record.task || "f",
-            };
-          }),
-          agenda: value.agenda.map((item) => ({
-            id: item.id,
-            date: item.date || "",
-            description: item.description || "",
-            type: item.type || "holiday",
-          })),
-          management_notes: Object.entries(value.managementNotes).map(
-            ([studentId, note]) => ({
-              student_id: studentId,
-              teacher_note: note.teacherNote || "",
-              sec_note: note.secNote || "",
-              status: note.status || "aguardando",
-              resolved_at: note.resolvedAt || "",
-            }),
-          ),
-        };
-      }
-
-      async function selectAllRows(table, columns = "*", orderColumn = null) {
-        const client = getSupabaseClient();
-        const pageSize = 1000;
-        const rows = [];
-
-        for (let from = 0; ; from += pageSize) {
-          let query = client
-            .from(table)
-            .select(columns)
-            .range(from, from + pageSize - 1);
-          if (orderColumn)
-            query = query.order(orderColumn, { ascending: true });
-
-          const { data, error } = await query;
-          if (error) throw error;
-
-          rows.push(...(data || []));
-          if (!data || data.length < pageSize) break;
-        }
-
-        return rows;
-      }
-
-      async function loadStateFromSupabase() {
-        const client = getSupabaseClient();
-        if (!client) throw new Error("Supabase não configurado.");
-
-        const [
-          classesRows,
-          studentsRows,
-          attendanceRows,
-          agendaRows,
-          notesRows,
-        ] = await Promise.all([
-          selectAllRows("classes", "*", "id"),
-          selectAllRows("students", "*", "id"),
-          selectAllRows("attendance", "*", "date"),
-          selectAllRows("agenda", "*", "id"),
-          selectAllRows("management_notes", "*", "student_id"),
-        ]);
-
-        const attendance = {};
-        attendanceRows.forEach((record) => {
-          const key = `${record.student_id}_${record.date}`;
-          attendance[key] = {
-            id: record.id,
-            status: record.status || "p",
-            task: record.task || "f",
+    function stateToRows(value) {
+      return {
+        classes: value.classes.map(c => ({
+          id: c.id,
+          teacher: c.teacher || '',
+          name: c.name || '',
+          freq: c.freq || '',
+          code: c.code || '',
+          weekdays: c.weekdays || []
+        })),
+        students: value.students.map(s => ({
+          id: s.id,
+          class_id: s.classId || null,
+          code: s.code || '',
+          name: s.name || '',
+          parent: s.parent || '',
+          phone: s.phone || ''
+        })),
+        attendance: Object.entries(value.attendance).map(([key, record]) => {
+          const separatorIndex = key.lastIndexOf('_');
+          return {
+            id: record.id || null,
+            student_id: separatorIndex >= 0 ? key.slice(0, separatorIndex) : '',
+            date: separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '',
+            status: record.status || 'p',
+            task: record.task || 'f'
           };
-        });
-
-        const managementNotes = {};
-        notesRows.forEach((note) => {
-          managementNotes[note.student_id] = {
-            teacherNote: note.teacher_note || "",
-            secNote: note.sec_note || "",
-            status: note.status || "aguardando",
-            resolvedAt: note.resolved_at || "",
-          };
-        });
-
-        return normalizeState({
-          classes: classesRows.map((c) => ({
-            id: c.id,
-            teacher: c.teacher || "",
-            name: c.name || "",
-            freq: c.freq || "",
-            code: c.code || "",
-            weekdays: Array.isArray(c.weekdays) ? c.weekdays : [],
-          })),
-          students: studentsRows.map((s) => ({
-            id: s.id,
-            classId: s.class_id || "",
-            code: s.code || "",
-            name: s.name || "",
-            parent: s.parent || "",
-            phone: s.phone || "",
-          })),
-          attendance,
-          agenda: agendaRows.map((item) => ({
-            id: item.id,
-            date: item.date || "",
-            description: item.description || "",
-            type: item.type || "holiday",
-          })),
-          managementNotes,
-        });
-      }
-
-      async function upsertRows(table, rows, primaryKey) {
-        const client = getSupabaseClient();
-        for (let i = 0; i < rows.length; i += 500) {
-          const { error } = await client
-            .from(table)
-            .upsert(rows.slice(i, i + 500), { onConflict: primaryKey });
-          if (error) throw error;
-        }
-      }
-
-      function generateUuid() {
-        if (window.crypto?.randomUUID) {
-          return window.crypto.randomUUID();
-        }
-
-        if (window.crypto?.getRandomValues) {
-          const bytes = new Uint8Array(16);
-          window.crypto.getRandomValues(bytes);
-          bytes[6] = (bytes[6] & 0x0f) | 0x40;
-          bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-          const hex = Array.from(bytes, (byte) =>
-            byte.toString(16).padStart(2, "0"),
-          );
-          return [
-            hex.slice(0, 4).join(""),
-            hex.slice(4, 6).join(""),
-            hex.slice(6, 8).join(""),
-            hex.slice(8, 10).join(""),
-            hex.slice(10, 16).join(""),
-          ].join("-");
-        }
-
-        // Last-resort UUID v4-compatible fallback for older browsers.
-        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-          /[xy]/g,
-          (char) => {
-            const random = Math.floor(Math.random() * 16);
-            const value = char === "x" ? random : (random & 0x3) | 0x8;
-            return value.toString(16);
-          },
-        );
-      }
-
-      async function persistAttendanceRow(key, record) {
-        const client = getSupabaseClient();
-        const separatorIndex = key.lastIndexOf("_");
-        const studentId =
-          separatorIndex >= 0 ? key.slice(0, separatorIndex) : "";
-        const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : "";
-        const payload = {
+        }),
+        agenda: value.agenda.map(item => ({
+          id: item.id,
+          date: item.date || '',
+          description: item.description || '',
+          type: item.type || 'holiday'
+        })),
+        management_notes: Object.entries(value.managementNotes).map(([studentId, note]) => ({
           student_id: studentId,
-          date,
-          status: record.status || "p",
-          task: record.task || "f",
+          teacher_note: note.teacherNote || '',
+          sec_note: note.secNote || '',
+          status: note.status || 'aguardando',
+          resolved_at: note.resolvedAt || ''
+        }))
+      };
+    }
+
+    async function selectAllRows(table, columns = '*', orderColumn = null) {
+      const client = getSupabaseClient();
+      const pageSize = 1000;
+      const rows = [];
+
+      for (let from = 0; ; from += pageSize) {
+        let query = client.from(table).select(columns).range(from, from + pageSize - 1);
+        if (orderColumn) query = query.order(orderColumn, { ascending: true });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+
+      return rows;
+    }
+
+    async function loadStateFromSupabase() {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Supabase não configurado.');
+
+      const [classesRows, studentsRows, attendanceRows, agendaRows, notesRows] = await Promise.all([
+        selectAllRows('classes', '*', 'id'),
+        selectAllRows('students', '*', 'id'),
+        selectAllRows('attendance', '*', 'date'),
+        selectAllRows('agenda', '*', 'id'),
+        selectAllRows('management_notes', '*', 'student_id')
+      ]);
+
+      const attendance = {};
+      attendanceRows.forEach(record => {
+        const key = `${record.student_id}_${record.date}`;
+        attendance[key] = {
+          id: record.id,
+          status: record.status || 'p',
+          task: record.task || 'f'
         };
-
-        let attendanceId = record.id || null;
-
-        if (!attendanceId) {
-          const { data: existingRows, error: findError } = await client
-            .from("attendance")
-            .select("id")
-            .eq("student_id", studentId)
-            .eq("date", date)
-            .limit(1);
-          if (findError) throw findError;
-          attendanceId = existingRows?.[0]?.id || null;
-        }
-
-        if (attendanceId) {
-          const { error } = await client
-            .from("attendance")
-            .update(payload)
-            .eq("id", attendanceId);
-          if (error) throw error;
-        } else {
-          // The live attendance table requires an explicit id and has no database default.
-          // Generate it before the first insert so saving creates exactly one request/row.
-          const newAttendanceId = generateUuid();
-          const { data, error } = await client
-            .from("attendance")
-            .insert({ id: newAttendanceId, ...payload })
-            .select("id")
-            .single();
-
-          if (error) throw error;
-          attendanceId = data?.id || newAttendanceId;
-        }
-
-        record.id = attendanceId;
-        return attendanceId;
-      }
-
-      async function upsertAttendanceState(value) {
-        for (const [key, record] of Object.entries(value.attendance || {})) {
-          await persistAttendanceRow(key, record);
-        }
-      }
-
-      async function upsertStateToSupabase(value) {
-        if (!getSupabaseClient()) return;
-
-        const rows = stateToRows(value);
-        await upsertRows("classes", rows.classes, "id");
-        await upsertRows("students", rows.students, "id");
-        await upsertAttendanceState(value);
-        await upsertRows("agenda", rows.agenda, "id");
-        await upsertRows(
-          "management_notes",
-          rows.management_notes,
-          "student_id",
-        );
-      }
-
-      function enqueueSupabaseWrite(operation) {
-        if (!getSupabaseClient()) return Promise.resolve();
-
-        supabaseWriteQueue = supabaseWriteQueue
-          .catch(() => undefined)
-          .then(operation)
-          .catch((error) => {
-            console.error("Erro ao salvar no Supabase:", error);
-            showToast(
-              "Erro ao sincronizar com o banco. Dados mantidos neste navegador.",
-            );
-          });
-
-        return supabaseWriteQueue;
-      }
-
-      function getTableChanges(previousRows, currentRows, primaryKey) {
-        const previousById = new Map(
-          previousRows.map((row) => [row[primaryKey], row]),
-        );
-        const currentById = new Map(
-          currentRows.map((row) => [row[primaryKey], row]),
-        );
-
-        const upserts = currentRows.filter((row) => {
-          const previous = previousById.get(row[primaryKey]);
-          return !previous || JSON.stringify(previous) !== JSON.stringify(row);
-        });
-
-        const deletes = previousRows
-          .filter((row) => !currentById.has(row[primaryKey]))
-          .map((row) => row[primaryKey]);
-
-        return { upserts, deletes };
-      }
-
-      async function deleteRows(table, primaryKey, ids) {
-        const client = getSupabaseClient();
-        for (let i = 0; i < ids.length; i += 200) {
-          const { error } = await client
-            .from(table)
-            .delete()
-            .in(primaryKey, ids.slice(i, i + 200));
-          if (error) throw error;
-        }
-      }
-
-      async function syncStateChanges(previousValue, currentValue) {
-        const client = getSupabaseClient();
-        if (!client) return;
-
-        const previousRows = stateToRows(previousValue);
-        const currentRows = stateToRows(currentValue);
-        const changes = [
-          {
-            table: "classes",
-            primaryKey: "id",
-            ...getTableChanges(previousRows.classes, currentRows.classes, "id"),
-          },
-          {
-            table: "students",
-            primaryKey: "id",
-            ...getTableChanges(
-              previousRows.students,
-              currentRows.students,
-              "id",
-            ),
-          },
-          {
-            table: "agenda",
-            primaryKey: "id",
-            ...getTableChanges(previousRows.agenda, currentRows.agenda, "id"),
-          },
-          {
-            table: "management_notes",
-            primaryKey: "student_id",
-            ...getTableChanges(
-              previousRows.management_notes,
-              currentRows.management_notes,
-              "student_id",
-            ),
-          },
-        ];
-
-        // Excluir dependências primeiro, caso chaves estrangeiras sejam adicionadas futuramente.
-        for (const tableName of [
-          "management_notes",
-          "students",
-          "agenda",
-          "classes",
-        ]) {
-          const change = changes.find((item) => item.table === tableName);
-          if (change.deletes.length)
-            await deleteRows(change.table, change.primaryKey, change.deletes);
-        }
-
-        // Inserir/atualizar pais antes dos registros dependentes.
-        for (const tableName of [
-          "classes",
-          "students",
-          "agenda",
-          "management_notes",
-        ]) {
-          const change = changes.find((item) => item.table === tableName);
-          if (!change.upserts.length) continue;
-          await upsertRows(change.table, change.upserts, change.primaryKey);
-        }
-      }
-
-      function saveState() {
-        saveCachedState();
-        const previousSnapshot = cloneState(lastSyncedState);
-        const currentSnapshot = cloneState(state);
-
-        return enqueueSupabaseWrite(async () => {
-          await syncStateChanges(previousSnapshot, currentSnapshot);
-          lastSyncedState = cloneState(currentSnapshot);
-        });
-      }
-
-      function saveAttendanceRecord(studentId, date, status, task) {
-        const key = `${studentId}_${date}`;
-        const existingRecord = state.attendance[key] || {};
-        const record = { id: existingRecord.id || null, status, task };
-        state.attendance[key] = record;
-        saveCachedState();
-
-        return enqueueSupabaseWrite(async () => {
-          const attendanceId = await persistAttendanceRow(key, record);
-
-          // The record may have been removed while this queued write was waiting.
-          if (state.attendance[key] === record) {
-            state.attendance[key].id = attendanceId;
-            lastSyncedState.attendance[key] = {
-              id: attendanceId,
-              status,
-              task,
-            };
-            saveCachedState();
-          }
-        });
-      }
-
-      async function clearRemoteTable(table, primaryKey) {
-        const client = getSupabaseClient();
-        const rows = await selectAllRows(table, primaryKey, primaryKey);
-        const ids = rows.map((row) => row[primaryKey]);
-
-        for (let i = 0; i < ids.length; i += 200) {
-          const { error: deleteError } = await client
-            .from(table)
-            .delete()
-            .in(primaryKey, ids.slice(i, i + 200));
-          if (deleteError) throw deleteError;
-        }
-      }
-
-      async function replaceSupabaseState(value) {
-        if (!getSupabaseClient()) return;
-
-        await clearRemoteTable("management_notes", "student_id");
-        await clearRemoteTable("attendance", "id");
-        await clearRemoteTable("students", "id");
-        await clearRemoteTable("classes", "id");
-        await clearRemoteTable("agenda", "id");
-        await upsertStateToSupabase(value);
-      }
-
-      async function initializeState() {
-        if (stateInitialized) return;
-        stateInitialized = true;
-
-        const cachedState = loadCachedState();
-        if (!hasSupabaseConfig()) {
-          state = cachedState;
-          lastSyncedState = cloneState(state);
-          console.warn(
-            "Supabase não configurado; usando somente o cache local.",
-          );
-          showToast("Banco não configurado. Usando dados locais.");
-          return;
-        }
-
-        try {
-          const remoteState = await loadStateFromSupabase();
-
-          // Migração automática: envia os dados antigos do localStorage quando o banco ainda está vazio.
-          if (!stateHasData(remoteState) && stateHasData(cachedState)) {
-            state = cachedState;
-            await upsertStateToSupabase(state);
-            lastSyncedState = cloneState(state);
-            saveCachedState();
-            showToast("Dados locais migrados para o Supabase!");
-          } else {
-            state = remoteState;
-            lastSyncedState = cloneState(state);
-            saveCachedState();
-          }
-        } catch (error) {
-          console.error("Erro ao carregar dados do Supabase:", error);
-          state = cachedState;
-          lastSyncedState = cloneState(state);
-          showToast("Não foi possível acessar o banco. Usando dados locais.");
-        }
-      }
-
-      // --- UTILS DE DATA E FORMATO ---
-      const genId = generateUuid;
-      const escapeHTML = (str) =>
-        (str || "").replace(
-          /[&<>'"]/g,
-          (tag) =>
-            ({
-              "&": "&amp;",
-              "<": "&lt;",
-              ">": "&gt;",
-              "'": "&#39;",
-              '"': "&quot;",
-            })[tag],
-        );
-
-      function showToast(msg) {
-        const t = document.getElementById("toast");
-        t.textContent = msg;
-        t.classList.remove("hidden");
-        setTimeout(() => t.classList.add("hidden"), 2000);
-      }
-
-      // Função para calcular o intervalo da semana (Segunda a Domingo)
-      function getWeekRange(dateStr) {
-        const parts = dateStr.split("-");
-        const d = new Date(parts[0], parts[1] - 1, parts[2]);
-
-        const day = d.getDay();
-        const diffToMon = d.getDate() - day + (day === 0 ? -6 : 1);
-
-        const mon = new Date(d.setDate(diffToMon));
-        const sun = new Date(mon);
-        sun.setDate(mon.getDate() + 6);
-
-        const fmt = (dt) => {
-          const day = String(dt.getDate()).padStart(2, "0");
-          const month = String(dt.getMonth() + 1).padStart(2, "0");
-          const year = dt.getFullYear();
-          return `${day}/${month}/${year}`;
-        };
-
-        const keyFmt = (dt) => {
-          const y = dt.getFullYear();
-          const m = String(dt.getMonth() + 1).padStart(2, "0");
-          const d = String(dt.getDate()).padStart(2, "0");
-          return `${y}-${m}-${d}`;
-        };
-
-        return {
-          key: keyFmt(mon),
-          label: `Semana de ${fmt(mon)} a ${fmt(sun)}`,
-        };
-      }
-
-      document.getElementById("inp-chamada-date").valueAsDate = new Date();
-
-      // --- FILTROS DE PROFESSOR E DIA ---
-      function getSelectedTeacher() {
-        return document.getElementById("sel-filter-teacher").value;
-      }
-
-      function getFilteredClasses() {
-        const teacher = getSelectedTeacher();
-        const selectedDays = Array.from(
-          document.querySelectorAll("#weekdays-filter input:checked"),
-        ).map((cb) => cb.value);
-
-        return state.classes.filter((c) => {
-          const matchTeacher = !teacher || c.teacher === teacher;
-          const matchDays =
-            selectedDays.length === 0 ||
-            selectedDays.some((d) => (c.weekdays || []).includes(d));
-          return matchTeacher && matchDays;
-        });
-      }
-
-      document
-        .getElementById("sel-filter-teacher")
-        .addEventListener("change", () => {
-          renderAll();
-        });
-      document
-        .getElementById("weekdays-filter")
-        .addEventListener("change", renderClasses);
-
-      // --- NAVEGAÇÃO DE ABAS ---
-      document.querySelectorAll(".tab-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          document
-            .querySelectorAll(".tab-btn")
-            .forEach((b) => b.classList.remove("tab-active"));
-          btn.classList.add("tab-active");
-          document
-            .querySelectorAll("main > section")
-            .forEach((s) => s.classList.add("hidden"));
-          document
-            .getElementById(`tab-${btn.dataset.tab}`)
-            .classList.remove("hidden");
-          renderAll();
-        });
       });
 
-      // --- GERENCIAMENTO DE TURMAS ---
-      document
-        .getElementById("form-create-class")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const teacher = document.getElementById("inp-teacher").value.trim();
-          const name = document.getElementById("inp-classname").value.trim();
-          const freq = document.getElementById("inp-freq").value;
-          const code = document.getElementById("inp-code").value.trim();
-          const weekdays = Array.from(
-            document.querySelectorAll("#create-weekdays input:checked"),
-          ).map((cb) => cb.value);
+      const managementNotes = {};
+      notesRows.forEach(note => {
+        managementNotes[note.student_id] = {
+          teacherNote: note.teacher_note || '',
+          secNote: note.sec_note || '',
+          status: note.status || 'aguardando',
+          resolvedAt: note.resolved_at || ''
+        };
+      });
 
-          state.classes.push({
-            id: genId(),
-            teacher,
-            name,
-            freq,
-            code,
-            weekdays,
-          });
-          saveState();
-          showToast("Turma criada com sucesso!");
-          e.target.reset();
-          renderAll();
+      return normalizeState({
+        classes: classesRows.map(c => ({
+          id: c.id,
+          teacher: c.teacher || '',
+          name: c.name || '',
+          freq: c.freq || '',
+          code: c.code || '',
+          weekdays: Array.isArray(c.weekdays) ? c.weekdays : []
+        })),
+        students: studentsRows.map(s => ({
+          id: s.id,
+          classId: s.class_id || '',
+          code: s.code || '',
+          name: s.name || '',
+          parent: s.parent || '',
+          phone: s.phone || ''
+        })),
+        attendance,
+        agenda: agendaRows.map(item => ({
+          id: item.id,
+          date: item.date || '',
+          description: item.description || '',
+          type: item.type || 'holiday'
+        })),
+        managementNotes
+      });
+    }
+
+    async function upsertRows(table, rows, primaryKey) {
+      const client = getSupabaseClient();
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await client.from(table).upsert(rows.slice(i, i + 500), { onConflict: primaryKey });
+        if (error) throw error;
+      }
+    }
+
+    function generateUuid() {
+      if (window.crypto?.randomUUID) {
+        return window.crypto.randomUUID();
+      }
+
+      if (window.crypto?.getRandomValues) {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0'));
+        return [
+          hex.slice(0, 4).join(''),
+          hex.slice(4, 6).join(''),
+          hex.slice(6, 8).join(''),
+          hex.slice(8, 10).join(''),
+          hex.slice(10, 16).join('')
+        ].join('-');
+      }
+
+      // Last-resort UUID v4-compatible fallback for older browsers.
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+        const random = Math.floor(Math.random() * 16);
+        const value = char === 'x' ? random : (random & 0x3) | 0x8;
+        return value.toString(16);
+      });
+    }
+
+    async function persistAttendanceRow(key, record) {
+      const client = getSupabaseClient();
+      const separatorIndex = key.lastIndexOf('_');
+      const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+      const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+      const payload = {
+        student_id: studentId,
+        date,
+        status: record.status || 'p',
+        task: record.task || 'f'
+      };
+
+      let attendanceId = record.id || null;
+
+      if (!attendanceId) {
+        const { data: existingRows, error: findError } = await client
+          .from('attendance')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('date', date)
+          .limit(1);
+        if (findError) throw findError;
+        attendanceId = existingRows?.[0]?.id || null;
+      }
+
+      if (attendanceId) {
+        const { error } = await client
+          .from('attendance')
+          .update(payload)
+          .eq('id', attendanceId);
+        if (error) throw error;
+      } else {
+        // The live attendance table requires an explicit id and has no database default.
+        // Generate it before the first insert so saving creates exactly one request/row.
+        const newAttendanceId = generateUuid();
+        const { data, error } = await client
+          .from('attendance')
+          .insert({ id: newAttendanceId, ...payload })
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        attendanceId = data?.id || newAttendanceId;
+      }
+
+      record.id = attendanceId;
+      return attendanceId;
+    }
+
+    async function upsertAttendanceState(value) {
+      for (const [key, record] of Object.entries(value.attendance || {})) {
+        await persistAttendanceRow(key, record);
+      }
+    }
+
+    async function upsertStateToSupabase(value) {
+      if (!getSupabaseClient()) return;
+
+      const rows = stateToRows(value);
+      await upsertRows('classes', rows.classes, 'id');
+      await upsertRows('students', rows.students, 'id');
+      await upsertAttendanceState(value);
+      await upsertRows('agenda', rows.agenda, 'id');
+      await upsertRows('management_notes', rows.management_notes, 'student_id');
+    }
+
+    function enqueueSupabaseWrite(operation) {
+      if (!getSupabaseClient()) return Promise.resolve();
+
+      supabaseWriteQueue = supabaseWriteQueue
+        .catch(() => undefined)
+        .then(operation)
+        .catch(error => {
+          console.error('Erro ao salvar no Supabase:', error);
+          showToast('Erro ao sincronizar com o banco. Dados mantidos neste navegador.');
         });
 
-      function renderClasses() {
-        const container = document.getElementById("class-list");
-        const classes = getFilteredClasses();
+      return supabaseWriteQueue;
+    }
 
-        container.innerHTML = classes
-          .map((c) => {
-            const count = state.students.filter(
-              (s) => s.classId === c.id,
-            ).length;
-            return `
+    function getTableChanges(previousRows, currentRows, primaryKey) {
+      const previousById = new Map(previousRows.map(row => [row[primaryKey], row]));
+      const currentById = new Map(currentRows.map(row => [row[primaryKey], row]));
+
+      const upserts = currentRows.filter(row => {
+        const previous = previousById.get(row[primaryKey]);
+        return !previous || JSON.stringify(previous) !== JSON.stringify(row);
+      });
+
+      const deletes = previousRows
+        .filter(row => !currentById.has(row[primaryKey]))
+        .map(row => row[primaryKey]);
+
+      return { upserts, deletes };
+    }
+
+    async function deleteRows(table, primaryKey, ids) {
+      const client = getSupabaseClient();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error } = await client.from(table).delete().in(primaryKey, ids.slice(i, i + 200));
+        if (error) throw error;
+      }
+    }
+
+    async function syncStateChanges(previousValue, currentValue) {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const previousRows = stateToRows(previousValue);
+      const currentRows = stateToRows(currentValue);
+      const changes = [
+        { table: 'classes', primaryKey: 'id', ...getTableChanges(previousRows.classes, currentRows.classes, 'id') },
+        { table: 'students', primaryKey: 'id', ...getTableChanges(previousRows.students, currentRows.students, 'id') },
+        { table: 'agenda', primaryKey: 'id', ...getTableChanges(previousRows.agenda, currentRows.agenda, 'id') },
+        { table: 'management_notes', primaryKey: 'student_id', ...getTableChanges(previousRows.management_notes, currentRows.management_notes, 'student_id') }
+      ];
+
+      // Excluir dependências primeiro, caso chaves estrangeiras sejam adicionadas futuramente.
+      for (const tableName of ['management_notes', 'students', 'agenda', 'classes']) {
+        const change = changes.find(item => item.table === tableName);
+        if (change.deletes.length) await deleteRows(change.table, change.primaryKey, change.deletes);
+      }
+
+      // Inserir/atualizar pais antes dos registros dependentes.
+      for (const tableName of ['classes', 'students', 'agenda', 'management_notes']) {
+        const change = changes.find(item => item.table === tableName);
+        if (!change.upserts.length) continue;
+        await upsertRows(change.table, change.upserts, change.primaryKey);
+      }
+    }
+
+    function saveState() {
+      saveCachedState();
+      const previousSnapshot = cloneState(lastSyncedState);
+      const currentSnapshot = cloneState(state);
+
+      return enqueueSupabaseWrite(async () => {
+        await syncStateChanges(previousSnapshot, currentSnapshot);
+        lastSyncedState = cloneState(currentSnapshot);
+      });
+    }
+
+    function saveAttendanceRecord(studentId, date, status, task) {
+      const key = `${studentId}_${date}`;
+      const existingRecord = state.attendance[key] || {};
+      const record = { id: existingRecord.id || null, status, task };
+      state.attendance[key] = record;
+      saveCachedState();
+
+      return enqueueSupabaseWrite(async () => {
+        const attendanceId = await persistAttendanceRow(key, record);
+
+        // The record may have been removed while this queued write was waiting.
+        if (state.attendance[key] === record) {
+          state.attendance[key].id = attendanceId;
+          lastSyncedState.attendance[key] = { id: attendanceId, status, task };
+          saveCachedState();
+        }
+      });
+    }
+
+    async function clearRemoteTable(table, primaryKey) {
+      const client = getSupabaseClient();
+      const rows = await selectAllRows(table, primaryKey, primaryKey);
+      const ids = rows.map(row => row[primaryKey]);
+
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error: deleteError } = await client.from(table).delete().in(primaryKey, ids.slice(i, i + 200));
+        if (deleteError) throw deleteError;
+      }
+    }
+
+    async function replaceSupabaseState(value) {
+      if (!getSupabaseClient()) return;
+
+      await clearRemoteTable('management_notes', 'student_id');
+      await clearRemoteTable('attendance', 'id');
+      await clearRemoteTable('students', 'id');
+      await clearRemoteTable('classes', 'id');
+      await clearRemoteTable('agenda', 'id');
+      await upsertStateToSupabase(value);
+    }
+
+    async function initializeState() {
+      if (stateInitialized) return;
+      stateInitialized = true;
+
+      const cachedState = loadCachedState();
+      if (!hasSupabaseConfig()) {
+        state = cachedState;
+        lastSyncedState = cloneState(state);
+        console.warn('Supabase não configurado; usando somente o cache local.');
+        showToast('Banco não configurado. Usando dados locais.');
+        return;
+      }
+
+      try {
+        const remoteState = await loadStateFromSupabase();
+
+        // Migração automática: envia os dados antigos do localStorage quando o banco ainda está vazio.
+        if (!stateHasData(remoteState) && stateHasData(cachedState)) {
+          state = cachedState;
+          await upsertStateToSupabase(state);
+          lastSyncedState = cloneState(state);
+          saveCachedState();
+          showToast('Dados locais migrados para o Supabase!');
+        } else {
+          state = remoteState;
+          lastSyncedState = cloneState(state);
+          saveCachedState();
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do Supabase:', error);
+        state = cachedState;
+        lastSyncedState = cloneState(state);
+        showToast('Não foi possível acessar o banco. Usando dados locais.');
+      }
+    }
+
+    // --- UTILS DE DATA E FORMATO ---
+    const genId = generateUuid;
+    const escapeHTML = str => (str || '').replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag]));
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    // Função para calcular o intervalo da semana (Segunda a Domingo)
+    function getWeekRange(dateStr) {
+      const parts = dateStr.split('-');
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      
+      const day = d.getDay();
+      const diffToMon = d.getDate() - day + (day === 0 ? -6 : 1);
+      
+      const mon = new Date(d.setDate(diffToMon));
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+
+      const fmt = (dt) => {
+        const day = String(dt.getDate()).padStart(2, '0');
+        const month = String(dt.getMonth() + 1).padStart(2, '0');
+        const year = dt.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
+      const keyFmt = (dt) => {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      return {
+        key: keyFmt(mon),
+        label: `Semana de ${fmt(mon)} a ${fmt(sun)}`
+      };
+    }
+
+    document.getElementById('inp-chamada-date').valueAsDate = new Date();
+
+    // --- FILTROS DE PROFESSOR E DIA ---
+    function getSelectedTeacher() {
+      return document.getElementById('sel-filter-teacher').value;
+    }
+
+    function getFilteredClasses() {
+      const teacher = getSelectedTeacher();
+      const selectedDays = Array.from(document.querySelectorAll('#weekdays-filter input:checked')).map(cb => cb.value);
+
+      return state.classes.filter(c => {
+        const matchTeacher = !teacher || c.teacher === teacher;
+        const matchDays = selectedDays.length === 0 || selectedDays.some(d => (c.weekdays || []).includes(d));
+        return matchTeacher && matchDays;
+      });
+    }
+
+    document.getElementById('sel-filter-teacher').addEventListener('change', () => {
+      renderAll();
+    });
+    document.getElementById('weekdays-filter').addEventListener('change', renderClasses);
+
+    // --- NAVEGAÇÃO DE ABAS ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+        renderAll();
+      });
+    });
+
+    // --- GERENCIAMENTO DE TURMAS ---
+    document.getElementById('form-create-class').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const teacher = document.getElementById('inp-teacher').value.trim();
+      const name = document.getElementById('inp-classname').value.trim();
+      const freq = document.getElementById('inp-freq').value;
+      const code = document.getElementById('inp-code').value.trim();
+      const weekdays = Array.from(document.querySelectorAll('#create-weekdays input:checked')).map(cb => cb.value);
+
+      state.classes.push({ id: genId(), teacher, name, freq, code, weekdays });
+      saveState();
+      showToast('Turma criada com sucesso!');
+      e.target.reset();
+      renderAll();
+    });
+
+    function renderClasses() {
+      const container = document.getElementById('class-list');
+      const classes = getFilteredClasses();
+
+      container.innerHTML = classes.map(c => {
+        const count = state.students.filter(s => s.classId === c.id).length;
+        return `
           <div class="bg-white p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
             <div>
               <div class="flex justify-between items-start">
-                <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(c.name)} ${c.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(c.code)})</span>` : ""}</h3>
+                <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(c.name)} ${c.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(c.code)})</span>` : ''}</h3>
                 <span class="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${count} alu.</span>
               </div>
               <p class="text-[11px] text-slate-500 mt-1">Prof: <b>${escapeHTML(c.teacher)}</b></p>
-              <p class="text-[10px] text-slate-400">${(c.weekdays || []).join(", ") || "Sem dias"}</p>
+              <p class="text-[10px] text-slate-400">${(c.weekdays || []).join(', ') || 'Sem dias'}</p>
             </div>
             <div class="flex gap-1 mt-2">
               <button onclick="openClassDetails('${c.id}')" class="flex-1 bg-indigo-50 text-indigo-600 py-1 rounded text-xs font-semibold hover:bg-indigo-100">Alunos</button>
@@ -1378,155 +905,137 @@
             </div>
           </div>
         `;
-          })
-          .join("");
-      }
+      }).join('');
+    }
 
-      // --- MODAL DE EDIÇÃO DE TURMA ---
-      function openEditClassModal(classId) {
-        const cls = state.classes.find((c) => c.id === classId);
-        if (!cls) return;
+    // --- MODAL DE EDIÇÃO DE TURMA ---
+    function openEditClassModal(classId) {
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
 
-        document.getElementById("edit-cls-id").value = cls.id;
-        document.getElementById("edit-cls-teacher").value = cls.teacher || "";
-        document.getElementById("edit-cls-name").value = cls.name || "";
-        document.getElementById("edit-cls-freq").value = cls.freq || "1x2h";
-        document.getElementById("edit-cls-code").value = cls.code || "";
+      document.getElementById('edit-cls-id').value = cls.id;
+      document.getElementById('edit-cls-teacher').value = cls.teacher || '';
+      document.getElementById('edit-cls-name').value = cls.name || '';
+      document.getElementById('edit-cls-freq').value = cls.freq || '1x2h';
+      document.getElementById('edit-cls-code').value = cls.code || '';
 
-        const checkboxes = document.querySelectorAll("#edit-weekdays input");
-        checkboxes.forEach((cb) => {
-          cb.checked = (cls.weekdays || []).includes(cb.value);
-        });
+      const checkboxes = document.querySelectorAll('#edit-weekdays input');
+      checkboxes.forEach(cb => {
+        cb.checked = (cls.weekdays || []).includes(cb.value);
+      });
 
-        document.getElementById("edit-class-modal").classList.remove("hidden");
-      }
+      document.getElementById('edit-class-modal').classList.remove('hidden');
+    }
 
-      function closeEditClassModal() {
-        document.getElementById("edit-class-modal").classList.add("hidden");
-      }
+    function closeEditClassModal() {
+      document.getElementById('edit-class-modal').classList.add('hidden');
+    }
 
-      document
-        .getElementById("form-edit-class")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const classId = document.getElementById("edit-cls-id").value;
-          const cls = state.classes.find((c) => c.id === classId);
+    document.getElementById('form-edit-class').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const classId = document.getElementById('edit-cls-id').value;
+      const cls = state.classes.find(c => c.id === classId);
 
-          if (cls) {
-            cls.teacher = document
-              .getElementById("edit-cls-teacher")
-              .value.trim();
-            cls.name = document.getElementById("edit-cls-name").value.trim();
-            cls.freq = document.getElementById("edit-cls-freq").value;
-            cls.code = document.getElementById("edit-cls-code").value.trim();
-            cls.weekdays = Array.from(
-              document.querySelectorAll("#edit-weekdays input:checked"),
-            ).map((cb) => cb.value);
+      if (cls) {
+        cls.teacher = document.getElementById('edit-cls-teacher').value.trim();
+        cls.name = document.getElementById('edit-cls-name').value.trim();
+        cls.freq = document.getElementById('edit-cls-freq').value;
+        cls.code = document.getElementById('edit-cls-code').value.trim();
+        cls.weekdays = Array.from(document.querySelectorAll('#edit-weekdays input:checked')).map(cb => cb.value);
 
-            saveState();
-            showToast("Turma atualizada com sucesso!");
-            closeEditClassModal();
-            renderAll();
-          }
-        });
-
-      function deleteClass() {
-        const classId = document.getElementById("edit-cls-id").value;
-        const cls = state.classes.find((c) => c.id === classId);
-        if (!cls) return;
-
-        const classStudents = state.students.filter(
-          (s) => s.classId === classId,
-        );
-        const studentIds = classStudents.map((s) => s.id);
-        const studentIdSet = new Set(studentIds);
-        const attendanceCount = Object.keys(state.attendance).filter((key) => {
-          const separatorIndex = key.lastIndexOf("_");
-          const studentId =
-            separatorIndex >= 0 ? key.slice(0, separatorIndex) : "";
-          return studentIdSet.has(studentId);
-        }).length;
-
-        const warning =
-          classStudents.length > 0
-            ? `Excluir a turma "${cls.name}" também removerá ${classStudents.length} aluno(s), ${attendanceCount} registro(s) de chamada e as notas de gestão relacionadas. Deseja continuar?`
-            : `Tem certeza de que deseja excluir a turma "${cls.name}"?`;
-
-        if (!confirm(warning)) return;
-
-        state.classes = state.classes.filter((c) => c.id !== classId);
-        state.students = state.students.filter((s) => s.classId !== classId);
-
-        Object.keys(state.attendance).forEach((key) => {
-          const separatorIndex = key.lastIndexOf("_");
-          const studentId =
-            separatorIndex >= 0 ? key.slice(0, separatorIndex) : "";
-          if (studentIdSet.has(studentId)) delete state.attendance[key];
-        });
-
-        studentIds.forEach(
-          (studentId) => delete state.managementNotes[studentId],
-        );
-
-        saveCachedState();
+        saveState();
+        showToast('Turma atualizada com sucesso!');
         closeEditClassModal();
-        document
-          .getElementById("class-details-section")
-          .classList.add("hidden");
         renderAll();
-        showToast("Turma excluída com sucesso!");
-
-        enqueueSupabaseWrite(async () => {
-          const client = getSupabaseClient();
-
-          for (let i = 0; i < studentIds.length; i += 200) {
-            const batch = studentIds.slice(i, i + 200);
-
-            const { error: attendanceError } = await client
-              .from("attendance")
-              .delete()
-              .in("student_id", batch);
-            if (attendanceError) throw attendanceError;
-
-            const { error: notesError } = await client
-              .from("management_notes")
-              .delete()
-              .in("student_id", batch);
-            if (notesError) throw notesError;
-
-            const { error: studentsError } = await client
-              .from("students")
-              .delete()
-              .in("id", batch);
-            if (studentsError) throw studentsError;
-          }
-
-          const { error: classError } = await client
-            .from("classes")
-            .delete()
-            .eq("id", classId);
-          if (classError) throw classError;
-
-          lastSyncedState = cloneState(state);
-        });
       }
+    });
 
-      function openClassDetails(classId) {
-        const cls = state.classes.find((c) => c.id === classId);
-        if (!cls) return;
+    function deleteClass() {
+      const classId = document.getElementById('edit-cls-id').value;
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
 
-        const section = document.getElementById("class-details-section");
-        section.classList.remove("hidden");
-        const students = state.students.filter((s) => s.classId === classId);
+      const classStudents = state.students.filter(s => s.classId === classId);
+      const studentIds = classStudents.map(s => s.id);
+      const studentIdSet = new Set(studentIds);
+      const attendanceCount = Object.keys(state.attendance).filter(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        return studentIdSet.has(studentId);
+      }).length;
 
-        // Ordenação alfabética das outras turmas para o dropdown de transferência
-        const otherClasses = state.classes
-          .filter((c) => c.id !== classId)
-          .sort((a, b) =>
-            a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
-          );
+      const warning = classStudents.length > 0
+        ? `Excluir a turma "${cls.name}" também removerá ${classStudents.length} aluno(s), ${attendanceCount} registro(s) de chamada e as notas de gestão relacionadas. Deseja continuar?`
+        : `Tem certeza de que deseja excluir a turma "${cls.name}"?`;
 
-        section.innerHTML = `
+      if (!confirm(warning)) return;
+
+      state.classes = state.classes.filter(c => c.id !== classId);
+      state.students = state.students.filter(s => s.classId !== classId);
+
+      Object.keys(state.attendance).forEach(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        if (studentIdSet.has(studentId)) delete state.attendance[key];
+      });
+
+      studentIds.forEach(studentId => delete state.managementNotes[studentId]);
+
+      saveCachedState();
+      closeEditClassModal();
+      document.getElementById('class-details-section').classList.add('hidden');
+      renderAll();
+      showToast('Turma excluída com sucesso!');
+
+      enqueueSupabaseWrite(async () => {
+        const client = getSupabaseClient();
+
+        for (let i = 0; i < studentIds.length; i += 200) {
+          const batch = studentIds.slice(i, i + 200);
+
+          const { error: attendanceError } = await client
+            .from('attendance')
+            .delete()
+            .in('student_id', batch);
+          if (attendanceError) throw attendanceError;
+
+          const { error: notesError } = await client
+            .from('management_notes')
+            .delete()
+            .in('student_id', batch);
+          if (notesError) throw notesError;
+
+          const { error: studentsError } = await client
+            .from('students')
+            .delete()
+            .in('id', batch);
+          if (studentsError) throw studentsError;
+        }
+
+        const { error: classError } = await client
+          .from('classes')
+          .delete()
+          .eq('id', classId);
+        if (classError) throw classError;
+
+        lastSyncedState = cloneState(state);
+      });
+    }
+
+    function openClassDetails(classId) {
+      const cls = state.classes.find(c => c.id === classId);
+      if (!cls) return;
+
+      const section = document.getElementById('class-details-section');
+      section.classList.remove('hidden');
+      const students = state.students.filter(s => s.classId === classId);
+      
+      // Ordenação alfabética das outras turmas para o dropdown de transferência
+      const otherClasses = state.classes
+        .filter(c => c.id !== classId)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+
+      section.innerHTML = `
         <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
           <div class="flex justify-between items-center border-b pb-2">
             <h3 class="font-bold text-slate-800 text-xs">${escapeHTML(cls.name)} - Alunos</h3>
@@ -1553,17 +1062,14 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                ${
-                  students
-                    .map(
-                      (s) => `
+                ${students.map(s => `
                   <tr>
-                    <td class="p-1.5 font-medium">${escapeHTML(s.name)} ${s.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(s.code)})</span>` : ""}</td>
-                    <td class="p-1.5">${escapeHTML(s.parent || "-")}<br><span class="text-slate-400">${escapeHTML(s.phone || "")}</span></td>
+                    <td class="p-1.5 font-medium">${escapeHTML(s.name)} ${s.code ? `<span class="text-[10px] text-slate-400">(${escapeHTML(s.code)})</span>` : ''}</td>
+                    <td class="p-1.5">${escapeHTML(s.parent || '-')}<br><span class="text-slate-400">${escapeHTML(s.phone || '')}</span></td>
                     <td class="p-1.5">
                       <select onchange="transferStudent('${s.id}', this.value)" class="border text-[11px] p-1 rounded max-w-[180px]">
                         <option value="">Mover...</option>
-                        ${otherClasses.map((oc) => `<option value="${oc.id}">${escapeHTML(oc.name)} (Prof. ${escapeHTML(oc.teacher || "-")})</option>`).join("")}
+                        ${otherClasses.map(oc => `<option value="${oc.id}">${escapeHTML(oc.name)} (Prof. ${escapeHTML(oc.teacher || '-')})</option>`).join('')}
                       </select>
                     </td>
                     <td class="p-1.5 space-x-1">
@@ -1571,291 +1077,227 @@
                       <button onclick="deleteStudent('${s.id}', '${cls.id}')" class="text-red-500 hover:underline">Excluir</button>
                     </td>
                   </tr>
-                `,
-                    )
-                    .join("") ||
-                  '<tr><td colspan="4" class="p-2 text-center text-slate-400">Nenhum aluno.</td></tr>'
-                }
+                `).join('') || '<tr><td colspan="4" class="p-2 text-center text-slate-400">Nenhum aluno.</td></tr>'}
               </tbody>
             </table>
           </div>
         </div>
       `;
 
-        document.getElementById("form-add-student").onsubmit = (e) => {
-          e.preventDefault();
-          state.students.push({
-            id: genId(),
-            classId: cls.id,
-            code: document.getElementById("stu-code").value.trim(),
-            name: document.getElementById("stu-name").value.trim(),
-            parent: document.getElementById("stu-parent").value.trim(),
-            phone: document.getElementById("stu-phone").value.trim(),
-          });
-          saveState();
-          showToast("Aluno adicionado!");
-          openClassDetails(cls.id);
-          renderClasses();
-        };
+      document.getElementById('form-add-student').onsubmit = (e) => {
+        e.preventDefault();
+        state.students.push({
+          id: genId(),
+          classId: cls.id,
+          code: document.getElementById('stu-code').value.trim(),
+          name: document.getElementById('stu-name').value.trim(),
+          parent: document.getElementById('stu-parent').value.trim(),
+          phone: document.getElementById('stu-phone').value.trim()
+        });
+        saveState();
+        showToast('Aluno adicionado!');
+        openClassDetails(cls.id);
+        renderClasses();
+      };
+    }
+
+    // --- ABA PESQUISAR ALUNO ---
+    document.getElementById('inp-search-student')?.addEventListener('input', renderSearchStudent);
+
+    function renderSearchStudent() {
+      const term = (document.getElementById('inp-search-student')?.value || '').toLowerCase().trim();
+      const container = document.getElementById('search-results');
+
+      if (!term) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Digite algo acima para pesquisar.</p>';
+        return;
       }
 
-      // --- ABA PESQUISAR ALUNO ---
-      document
-        .getElementById("inp-search-student")
-        ?.addEventListener("input", renderSearchStudent);
+      const results = state.students.filter(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        const nameMatch = (s.name || '').toLowerCase().includes(term);
+        const codeMatch = (s.code || '').toLowerCase().includes(term);
+        const classMatch = cls ? (cls.name || '').toLowerCase().includes(term) : false;
+        const schoolCodeMatch = cls ? (cls.code || '').toLowerCase().includes(term) : false;
 
-      function renderSearchStudent() {
-        const term = (
-          document.getElementById("inp-search-student")?.value || ""
-        )
-          .toLowerCase()
-          .trim();
-        const container = document.getElementById("search-results");
+        return nameMatch || codeMatch || classMatch || schoolCodeMatch;
+      });
 
-        if (!term) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Digite algo acima para pesquisar.</p>';
-          return;
-        }
+      if (results.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno ou turma encontrado.</p>';
+        return;
+      }
 
-        const results = state.students.filter((s) => {
-          const cls = state.classes.find((c) => c.id === s.classId);
-          const nameMatch = (s.name || "").toLowerCase().includes(term);
-          const codeMatch = (s.code || "").toLowerCase().includes(term);
-          const classMatch = cls
-            ? (cls.name || "").toLowerCase().includes(term)
-            : false;
-          const schoolCodeMatch = cls
-            ? (cls.code || "").toLowerCase().includes(term)
-            : false;
-
-          return nameMatch || codeMatch || classMatch || schoolCodeMatch;
-        });
-
-        if (results.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno ou turma encontrado.</p>';
-          return;
-        }
-
-        container.innerHTML = results
-          .map((s) => {
-            const cls = state.classes.find((c) => c.id === s.classId);
-            return `
+      container.innerHTML = results.map(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        return `
           <div class="p-3 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
             <div>
               <span class="font-bold text-slate-800 text-sm">${escapeHTML(s.name)}</span>
-              ${s.code ? `<span class="ml-1 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Cód: ${escapeHTML(s.code)}</span>` : ""}
-              <p class="text-slate-500 mt-0.5">Turma: <b>${escapeHTML(cls ? cls.name : "Sem Turma")}</b> | Prof: <b>${escapeHTML(cls ? cls.teacher : "-")}</b></p>
-              <p class="text-slate-400 text-[11px]">Resp: ${escapeHTML(s.parent || "Não inf.")} (${escapeHTML(s.phone || "-")})</p>
+              ${s.code ? `<span class="ml-1 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Cód: ${escapeHTML(s.code)}</span>` : ''}
+              <p class="text-slate-500 mt-0.5">Turma: <b>${escapeHTML(cls ? cls.name : 'Sem Turma')}</b> | Prof: <b>${escapeHTML(cls ? cls.teacher : '-')}</b></p>
+              <p class="text-slate-400 text-[11px]">Resp: ${escapeHTML(s.parent || 'Não inf.')} (${escapeHTML(s.phone || '-')})</p>
             </div>
             <button onclick="openEditStudentModal('${s.id}', '${s.classId}')" class="bg-blue-50 text-blue-600 px-3 py-1 rounded font-semibold hover:bg-blue-100">Editar ✏️</button>
           </div>
         `;
-          })
-          .join("");
+      }).join('');
+    }
+
+    // --- MODAL DE EDIÇÃO DO ALUNO ---
+    function openEditStudentModal(studentId, classId) {
+      const student = state.students.find(s => s.id === studentId);
+      if (!student) return;
+
+      document.getElementById('edit-stu-id').value = student.id;
+      document.getElementById('edit-stu-class-id').value = classId;
+      document.getElementById('edit-stu-code').value = student.code || '';
+      document.getElementById('edit-stu-name').value = student.name || '';
+      document.getElementById('edit-stu-parent').value = student.parent || '';
+      document.getElementById('edit-stu-phone').value = student.phone || '';
+
+      document.getElementById('edit-student-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-student-modal').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-student').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const studentId = document.getElementById('edit-stu-id').value;
+      const classId = document.getElementById('edit-stu-class-id').value;
+
+      const student = state.students.find(s => s.id === studentId);
+      if (student) {
+        student.code = document.getElementById('edit-stu-code').value.trim();
+        student.name = document.getElementById('edit-stu-name').value.trim();
+        student.parent = document.getElementById('edit-stu-parent').value.trim();
+        student.phone = document.getElementById('edit-stu-phone').value.trim();
+
+        saveState();
+        showToast('Dados do aluno atualizados!');
+        closeEditModal();
+        if (classId) openClassDetails(classId);
+        renderAll();
+      }
+    });
+
+    function transferStudent(studentId, targetClassId) {
+      if (!targetClassId) return;
+      const s = state.students.find(x => x.id === studentId);
+      if (s) { s.classId = targetClassId; saveState(); showToast('Aluno transferido!'); renderAll(); }
+    }
+
+    function deleteStudent(studentId, currentClassId) {
+      if (confirm('Tem certeza de que deseja excluir este aluno?')) {
+        state.students = state.students.filter(s => s.id !== studentId);
+        saveState();
+        openClassDetails(currentClassId);
+        renderClasses();
+      }
+    }
+
+    // --- ABA CHAMADA ---
+    document.getElementById('sel-class-chamada').addEventListener('change', renderChamada);
+    document.getElementById('inp-chamada-date').addEventListener('change', renderChamada);
+
+    function renderChamada() {
+      const classId = document.getElementById('sel-class-chamada').value;
+      const date = document.getElementById('inp-chamada-date').value;
+      const container = document.getElementById('chamada-list');
+
+      if (!classId || !date) { container.innerHTML = ''; return; }
+
+      const students = state.students.filter(s => s.classId === classId);
+      if (students.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Sem alunos nesta turma.</p>';
+        return;
       }
 
-      // --- MODAL DE EDIÇÃO DO ALUNO ---
-      function openEditStudentModal(studentId, classId) {
-        const student = state.students.find((s) => s.id === studentId);
-        if (!student) return;
+      container.innerHTML = students.map(s => {
+        const key = `${s.id}_${date}`;
+        const rec = state.attendance[key] || { status: 'p', task: 'f' };
 
-        document.getElementById("edit-stu-id").value = student.id;
-        document.getElementById("edit-stu-class-id").value = classId;
-        document.getElementById("edit-stu-code").value = student.code || "";
-        document.getElementById("edit-stu-name").value = student.name || "";
-        document.getElementById("edit-stu-parent").value = student.parent || "";
-        document.getElementById("edit-stu-phone").value = student.phone || "";
-
-        document
-          .getElementById("edit-student-modal")
-          .classList.remove("hidden");
-      }
-
-      function closeEditModal() {
-        document.getElementById("edit-student-modal").classList.add("hidden");
-      }
-
-      document
-        .getElementById("form-edit-student")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const studentId = document.getElementById("edit-stu-id").value;
-          const classId = document.getElementById("edit-stu-class-id").value;
-
-          const student = state.students.find((s) => s.id === studentId);
-          if (student) {
-            student.code = document
-              .getElementById("edit-stu-code")
-              .value.trim();
-            student.name = document
-              .getElementById("edit-stu-name")
-              .value.trim();
-            student.parent = document
-              .getElementById("edit-stu-parent")
-              .value.trim();
-            student.phone = document
-              .getElementById("edit-stu-phone")
-              .value.trim();
-
-            saveState();
-            showToast("Dados do aluno atualizados!");
-            closeEditModal();
-            if (classId) openClassDetails(classId);
-            renderAll();
-          }
-        });
-
-      function transferStudent(studentId, targetClassId) {
-        if (!targetClassId) return;
-        const s = state.students.find((x) => x.id === studentId);
-        if (s) {
-          s.classId = targetClassId;
-          saveState();
-          showToast("Aluno transferido!");
-          renderAll();
-        }
-      }
-
-      function deleteStudent(studentId, currentClassId) {
-        if (confirm("Tem certeza de que deseja excluir este aluno?")) {
-          state.students = state.students.filter((s) => s.id !== studentId);
-          saveState();
-          openClassDetails(currentClassId);
-          renderClasses();
-        }
-      }
-
-      // --- ABA CHAMADA ---
-      document
-        .getElementById("sel-class-chamada")
-        .addEventListener("change", renderChamada);
-      document
-        .getElementById("inp-chamada-date")
-        .addEventListener("change", renderChamada);
-
-      function renderChamada() {
-        const classId = document.getElementById("sel-class-chamada").value;
-        const date = document.getElementById("inp-chamada-date").value;
-        const container = document.getElementById("chamada-list");
-
-        if (!classId || !date) {
-          container.innerHTML = "";
-          return;
-        }
-
-        const students = state.students.filter((s) => s.classId === classId);
-        if (students.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Sem alunos nesta turma.</p>';
-          return;
-        }
-
-        container.innerHTML = students
-          .map((s) => {
-            const key = `${s.id}_${date}`;
-            const rec = state.attendance[key] || { status: "p", task: "s" };
-
-            return `
+        return `
           <div class="p-2.5 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2" data-student-id="${s.id}">
             <span class="font-medium text-slate-800 text-xs">${escapeHTML(s.name)}</span>
             <div class="flex flex-wrap gap-3">
               <div class="flex gap-1 status-group">
-                <button type="button" class="btn-toggle st-p ${rec.status === "p" ? "active" : ""}" data-val="p">Presente</button>
-                <button type="button" class="btn-toggle st-a ${rec.status === "a" ? "active" : ""}" data-val="a">Atraso</button>
-                <button type="button" class="btn-toggle st-f ${rec.status === "f" ? "active" : ""}" data-val="f">Falta</button>
-                <button type="button" class="btn-toggle bg-blue-100 text-blue-700 ${rec.status === "j" ? "active border-blue-600 font-bold" : ""}" data-val="j">Falta Just.</button>
+                <button type="button" class="btn-toggle st-p ${rec.status === 'p' ? 'active' : ''}" data-val="p">Presente</button>
+                <button type="button" class="btn-toggle st-a ${rec.status === 'a' ? 'active' : ''}" data-val="a">Atraso</button>
+                <button type="button" class="btn-toggle st-f ${rec.status === 'f' ? 'active' : ''}" data-val="f">Falta</button>
+                <button type="button" class="btn-toggle bg-blue-100 text-blue-700 ${rec.status === 'j' ? 'active border-blue-600 font-bold' : ''}" data-val="j">Falta Just.</button>
               </div>
               <div class="flex gap-1 task-group">
-                <button type="button" class="btn-toggle bg-slate-200 text-slate-700 ${rec.task === "s" ? "active border-slate-600 font-bold" : ""}" data-val="s">Sem Tarefa</button>
-                <button type="button" class="btn-toggle tk-f ${rec.task === "f" ? "active" : ""}" data-val="f">Feito</button>
-                <button type="button" class="btn-toggle tk-a ${rec.task === "a" ? "active" : ""}" data-val="a">Atrasado</button>
-                <button type="button" class="btn-toggle tk-n ${rec.task === "n" ? "active" : ""}" data-val="n">Não Feito</button>
+                <button type="button" class="btn-toggle tk-f ${rec.task === 'f' ? 'active' : ''}" data-val="f">Feito</button>
+                <button type="button" class="btn-toggle tk-a ${rec.task === 'a' ? 'active' : ''}" data-val="a">Atrasado</button>
+                <button type="button" class="btn-toggle tk-n ${rec.task === 'n' ? 'active' : ''}" data-val="n">Não Feito</button>
+                <button type="button" class="btn-toggle bg-slate-200 text-slate-700 ${rec.task === 's' ? 'active border-slate-600 font-bold' : ''}" data-val="s">Sem Tarefa</button>
               </div>
             </div>
           </div>
         `;
-          })
-          .join("");
+      }).join('');
 
-        container.onclick = (e) => {
-          const btn = e.target.closest(".btn-toggle");
-          if (!btn) return;
-          const group = btn.closest("div");
-          group.querySelectorAll(".btn-toggle").forEach((b) => {
-            b.classList.remove("active");
-            if (b.dataset.val === "s")
-              b.classList.remove("border-slate-600", "font-bold");
-            if (b.dataset.val === "j")
-              b.classList.remove("border-blue-600", "font-bold");
-          });
-          btn.classList.add("active");
-          if (btn.dataset.val === "s")
-            btn.classList.add("border-slate-600", "font-bold");
-          if (btn.dataset.val === "j")
-            btn.classList.add("border-blue-600", "font-bold");
+      container.onclick = (e) => {
+        const btn = e.target.closest('.btn-toggle');
+        if (!btn) return;
+        const group = btn.closest('div');
+        group.querySelectorAll('.btn-toggle').forEach(b => {
+          b.classList.remove('active');
+          if (b.dataset.val === 's') b.classList.remove('border-slate-600', 'font-bold');
+          if (b.dataset.val === 'j') b.classList.remove('border-blue-600', 'font-bold');
+        });
+        btn.classList.add('active');
+        if (btn.dataset.val === 's') btn.classList.add('border-slate-600', 'font-bold');
+        if (btn.dataset.val === 'j') btn.classList.add('border-blue-600', 'font-bold');
 
-          const row = btn.closest("[data-student-id]");
-          if (row) {
-            const sId = row.dataset.studentId;
-            const status =
-              row.querySelector(".status-group .active")?.dataset.val || "p";
-            const task =
-              row.querySelector(".task-group .active")?.dataset.val || "f";
-            saveAttendanceRecord(sId, date, status, task);
-          }
-        };
+        const row = btn.closest('[data-student-id]');
+        if (row) {
+          const sId = row.dataset.studentId;
+          const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
+          const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
+          saveAttendanceRecord(sId, date, status, task);
+        }
+      };
+    }
+
+    document.getElementById('btn-save-chamada').addEventListener('click', () => {
+      const date = document.getElementById('inp-chamada-date').value;
+      if (!date) return;
+
+      document.querySelectorAll('#chamada-list [data-student-id]').forEach(row => {
+        const sId = row.dataset.studentId;
+        const status = row.querySelector('.status-group .active')?.dataset.val || 'p';
+        const task = row.querySelector('.task-group .active')?.dataset.val || 'f';
+        saveAttendanceRecord(sId, date, status, task);
+      });
+      showToast('Registro de chamada salvo!');
+    });
+
+    // --- ABA AGENDA & FERIADOS ---
+    document.getElementById('form-create-agenda').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('agenda-date').value;
+      const description = document.getElementById('agenda-desc').value.trim();
+      const type = document.getElementById('agenda-type').value;
+
+      state.agenda.push({ id: genId(), date, description, type });
+      saveState();
+      showToast('Evento / Feriado adicionado!');
+      e.target.reset();
+      renderAgenda();
+    });
+
+    function renderAgenda() {
+      const container = document.getElementById('agenda-list');
+      if (state.agenda.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum evento ou feriado cadastrado.</p>';
+        return;
       }
 
-      document
-        .getElementById("btn-save-chamada")
-        .addEventListener("click", () => {
-          const date = document.getElementById("inp-chamada-date").value;
-          if (!date) return;
-
-          document
-            .querySelectorAll("#chamada-list [data-student-id]")
-            .forEach((row) => {
-              const sId = row.dataset.studentId;
-              const status =
-                row.querySelector(".status-group .active")?.dataset.val || "p";
-              const task =
-                row.querySelector(".task-group .active")?.dataset.val || "f";
-              saveAttendanceRecord(sId, date, status, task);
-            });
-          showToast("Registro de chamada salvo!");
-        });
-
-      // --- ABA AGENDA & FERIADOS ---
-      document
-        .getElementById("form-create-agenda")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const date = document.getElementById("agenda-date").value;
-          const description = document
-            .getElementById("agenda-desc")
-            .value.trim();
-          const type = document.getElementById("agenda-type").value;
-
-          state.agenda.push({ id: genId(), date, description, type });
-          saveState();
-          showToast("Evento / Feriado adicionado!");
-          e.target.reset();
-          renderAgenda();
-        });
-
-      function renderAgenda() {
-        const container = document.getElementById("agenda-list");
-        if (state.agenda.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum evento ou feriado cadastrado.</p>';
-          return;
-        }
-
-        container.innerHTML = state.agenda
-          .map(
-            (item) => `
+      container.innerHTML = state.agenda.map(item => `
         <div class="p-3 bg-white rounded-lg border border-slate-200 flex justify-between items-center text-xs">
           <div>
             <span class="font-bold text-slate-800">${escapeHTML(item.description)}</span>
@@ -1863,80 +1305,69 @@
           </div>
           <button onclick="deleteAgendaItem('${item.id}')" class="text-red-500 text-xs hover:underline">Excluir</button>
         </div>
-      `,
-          )
-          .join("");
+      `).join('');
+    }
+
+    function deleteAgendaItem(id) {
+      state.agenda = state.agenda.filter(a => a.id !== id);
+      saveState();
+      renderAgenda();
+    }
+
+    // --- RELATÓRIO SEPARADO POR SEMANA ---
+    document.getElementById('sel-class-report').addEventListener('change', renderRelatorio);
+
+    function renderRelatorio() {
+      const classId = document.getElementById('sel-class-report').value;
+      const container = document.getElementById('report-content');
+      if (!classId) { container.innerHTML = ''; return; }
+
+      const students = state.students.filter(s => s.classId === classId);
+      if (students.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno nesta turma.</p>';
+        return;
       }
 
-      function deleteAgendaItem(id) {
-        state.agenda = state.agenda.filter((a) => a.id !== id);
-        saveState();
-        renderAgenda();
-      }
+      // Agrupar registros da chamada por Semana
+      const weeksMap = {};
 
-      // --- RELATÓRIO SEPARADO POR SEMANA ---
-      document
-        .getElementById("sel-class-report")
-        .addEventListener("change", renderRelatorio);
+      Object.keys(state.attendance).forEach(key => {
+        const parts = key.split('_');
+        const studentId = parts[0];
+        const dateStr = parts[1];
 
-      function renderRelatorio() {
-        const classId = document.getElementById("sel-class-report").value;
-        const container = document.getElementById("report-content");
-        if (!classId) {
-          container.innerHTML = "";
-          return;
-        }
+        // Verificar se o aluno pertence a esta turma
+        if (students.some(s => s.id === studentId)) {
+          const weekInfo = getWeekRange(dateStr);
 
-        const students = state.students.filter((s) => s.classId === classId);
-        if (students.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno nesta turma.</p>';
-          return;
-        }
-
-        // Agrupar registros da chamada por Semana
-        const weeksMap = {};
-
-        Object.keys(state.attendance).forEach((key) => {
-          const parts = key.split("_");
-          const studentId = parts[0];
-          const dateStr = parts[1];
-
-          // Verificar se o aluno pertence a esta turma
-          if (students.some((s) => s.id === studentId)) {
-            const weekInfo = getWeekRange(dateStr);
-
-            if (!weeksMap[weekInfo.key]) {
-              weeksMap[weekInfo.key] = {
-                label: weekInfo.label,
-                recordsByStudent: {},
-              };
-            }
-
-            if (!weeksMap[weekInfo.key].recordsByStudent[studentId]) {
-              weeksMap[weekInfo.key].recordsByStudent[studentId] = [];
-            }
-
-            weeksMap[weekInfo.key].recordsByStudent[studentId].push(
-              state.attendance[key],
-            );
+          if (!weeksMap[weekInfo.key]) {
+            weeksMap[weekInfo.key] = {
+              label: weekInfo.label,
+              recordsByStudent: {}
+            };
           }
-        });
 
-        const sortedWeekKeys = Object.keys(weeksMap).sort().reverse();
+          if (!weeksMap[weekInfo.key].recordsByStudent[studentId]) {
+            weeksMap[weekInfo.key].recordsByStudent[studentId] = [];
+          }
 
-        if (sortedWeekKeys.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Nenhuma chamada registrada para esta turma ainda.</p>';
-          return;
+          weeksMap[weekInfo.key].recordsByStudent[studentId].push(state.attendance[key]);
         }
+      });
 
-        let html = "";
+      const sortedWeekKeys = Object.keys(weeksMap).sort().reverse();
 
-        sortedWeekKeys.forEach((weekKey) => {
-          const week = weeksMap[weekKey];
+      if (sortedWeekKeys.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Nenhuma chamada registrada para esta turma ainda.</p>';
+        return;
+      }
 
-          html += `
+      let html = '';
+
+      sortedWeekKeys.forEach(weekKey => {
+        const week = weeksMap[weekKey];
+
+        html += `
           <div class="bg-white rounded-xl border border-slate-200 overflow-hidden space-y-2">
             <div class="bg-slate-800 text-white px-4 py-2 flex justify-between items-center gap-2">
               <span class="font-bold text-xs">${escapeHTML(week.label)}</span>
@@ -1963,20 +1394,20 @@
                 <tbody class="divide-y divide-slate-100">
         `;
 
-          students.forEach((s) => {
-            const records = week.recordsByStudent[s.id] || [];
+        students.forEach(s => {
+          const records = week.recordsByStudent[s.id] || [];
 
-            const p = records.filter((r) => r.status === "p").length;
-            const a = records.filter((r) => r.status === "a").length;
-            const f = records.filter((r) => r.status === "f").length;
-            const fj = records.filter((r) => r.status === "j").length;
+          const p = records.filter(r => r.status === 'p').length;
+          const a = records.filter(r => r.status === 'a').length;
+          const f = records.filter(r => r.status === 'f').length;
+          const fj = records.filter(r => r.status === 'j').length;
 
-            const tf = records.filter((r) => r.task === "f").length;
-            const ta = records.filter((r) => r.task === "a").length;
-            const tn = records.filter((r) => r.task === "n").length;
-            const ts = records.filter((r) => r.task === "s").length;
+          const tf = records.filter(r => r.task === 'f').length;
+          const ta = records.filter(r => r.task === 'a').length;
+          const tn = records.filter(r => r.task === 'n').length;
+          const ts = records.filter(r => r.task === 's').length;
 
-            html += `
+          html += `
             <tr>
               <td class="p-2 font-medium">${escapeHTML(s.name)}</td>
               <td class="p-2 text-center font-bold text-emerald-600 bg-emerald-50/40">${p}</td>
@@ -1989,351 +1420,344 @@
               <td class="p-2 text-center font-bold text-slate-600 bg-slate-50">${ts}</td>
             </tr>
           `;
-          });
+        });
 
-          html += `
+        html += `
                 </tbody>
               </table>
             </div>
           </div>
         `;
-        });
+      });
 
-        container.innerHTML = html;
-      }
+      container.innerHTML = html;
+    }
 
-      function getWeekEndDate(weekKey) {
-        const [year, month, day] = weekKey.split("-").map(Number);
-        const endDate = new Date(year, month - 1, day);
-        endDate.setDate(endDate.getDate() + 6);
-        return `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
-      }
+    function getWeekEndDate(weekKey) {
+      const [year, month, day] = weekKey.split('-').map(Number);
+      const endDate = new Date(year, month - 1, day);
+      endDate.setDate(endDate.getDate() + 6);
+      return `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    }
 
-      function deleteWeeklyReport(classId, weekKey) {
-        const cls = state.classes.find((c) => c.id === classId);
-        const studentIds = state.students
-          .filter((s) => s.classId === classId)
-          .map((s) => s.id);
-        const studentIdSet = new Set(studentIds);
-        const keysToDelete = Object.keys(state.attendance).filter((key) => {
-          const separatorIndex = key.lastIndexOf("_");
-          const studentId =
-            separatorIndex >= 0 ? key.slice(0, separatorIndex) : "";
-          const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : "";
-          return (
-            studentIdSet.has(studentId) &&
-            date &&
-            getWeekRange(date).key === weekKey
-          );
-        });
+    function deleteWeeklyReport(classId, weekKey) {
+      const cls = state.classes.find(c => c.id === classId);
+      const studentIds = state.students.filter(s => s.classId === classId).map(s => s.id);
+      const studentIdSet = new Set(studentIds);
+      const keysToDelete = Object.keys(state.attendance).filter(key => {
+        const separatorIndex = key.lastIndexOf('_');
+        const studentId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : '';
+        const date = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+        return studentIdSet.has(studentId) && date && getWeekRange(date).key === weekKey;
+      });
 
-        if (!keysToDelete.length) return;
+      if (!keysToDelete.length) return;
 
-        const weekLabel = getWeekRange(weekKey).label;
-        const className = cls?.name || "esta turma";
-        if (
-          !confirm(
-            `Excluir todos os ${keysToDelete.length} registro(s) de chamada de ${className} em ${weekLabel}? Esta ação não pode ser desfeita.`,
-          )
-        )
-          return;
+      const weekLabel = getWeekRange(weekKey).label;
+      const className = cls?.name || 'esta turma';
+      if (!confirm(`Excluir todos os ${keysToDelete.length} registro(s) de chamada de ${className} em ${weekLabel}? Esta ação não pode ser desfeita.`)) return;
 
-        keysToDelete.forEach((key) => delete state.attendance[key]);
-        saveCachedState();
-        renderAll();
-        showToast("Relatório e registros de chamada excluídos!");
+      keysToDelete.forEach(key => delete state.attendance[key]);
+      saveCachedState();
+      renderAll();
+      showToast('Relatório e registros de chamada excluídos!');
 
-        const weekEnd = getWeekEndDate(weekKey);
-        enqueueSupabaseWrite(async () => {
-          const client = getSupabaseClient();
+      const weekEnd = getWeekEndDate(weekKey);
+      enqueueSupabaseWrite(async () => {
+        const client = getSupabaseClient();
 
-          for (let i = 0; i < studentIds.length; i += 200) {
-            const batch = studentIds.slice(i, i + 200);
-            const { error } = await client
-              .from("attendance")
-              .delete()
-              .in("student_id", batch)
-              .gte("date", weekKey)
-              .lte("date", weekEnd);
-            if (error) throw error;
-          }
-
-          lastSyncedState = cloneState(state);
-        });
-      }
-
-      // --- ABA GESTÃO COM NOTAS E STATUS ---
-      function renderGestao() {
-        const container = document.getElementById("gestao-content");
-        const holidayDates = new Set((state.agenda || []).map((a) => a.date));
-        const teacherFilter = getSelectedTeacher();
-        const alerts = [];
-
-        state.students.forEach((s) => {
-          const cls = state.classes.find((c) => c.id === s.classId);
-          if (!cls) return;
-
-          if (teacherFilter && cls.teacher !== teacherFilter) return;
-
-          const dates = Object.keys(state.attendance)
-            .filter((k) => k.startsWith(`${s.id}_`))
-            .map((k) => k.split("_")[1])
-            .sort();
-
-          let consecutiveAbsences = 0;
-          let consecutiveHours = 0;
-          const hourCost =
-            cls.freq === "1x2h" ? 2 : cls.freq === "1x1h30" ? 1.5 : 1;
-          const requiredConsecutiveAbsences = cls.freq === "1x2h" ? 1 : 2;
-
-          for (const date of dates) {
-            if (holidayDates.has(date)) continue;
-
-            const rec = state.attendance[`${s.id}_${date}`];
-            if (rec.status === "f") {
-              consecutiveAbsences += 1;
-              consecutiveHours += hourCost;
-            } else {
-              // Presença, atraso e falta justificada interrompem a sequência de faltas não justificadas.
-              consecutiveAbsences = 0;
-              consecutiveHours = 0;
-            }
-
-            if (consecutiveAbsences >= requiredConsecutiveAbsences) {
-              const weekInfo = getWeekRange(date);
-              alerts.push({
-                student: s,
-                cls,
-                hours: consecutiveHours,
-                absences: consecutiveAbsences,
-                weekKey: weekInfo.key,
-                weekLabel: weekInfo.label,
-                triggerDate: date,
-              });
-              break;
-            }
-          }
-        });
-
-        if (alerts.length === 0) {
-          container.innerHTML =
-            '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno com excesso de faltas encontrado para esta seleção.</p>';
-          return;
+        for (let i = 0; i < studentIds.length; i += 200) {
+          const batch = studentIds.slice(i, i + 200);
+          const { error } = await client
+            .from('attendance')
+            .delete()
+            .in('student_id', batch)
+            .gte('date', weekKey)
+            .lte('date', weekEnd);
+          if (error) throw error;
         }
 
-        alerts.sort((a, b) => {
-          const weekComparison = b.weekKey.localeCompare(a.weekKey);
-          if (weekComparison !== 0) return weekComparison;
-          return a.student.name.localeCompare(b.student.name, "pt-BR", {
-            sensitivity: "base",
-          });
-        });
+        lastSyncedState = cloneState(state);
+      });
+    }
 
-        const alertsByWeek = alerts.reduce((groups, alert) => {
-          if (!groups[alert.weekKey]) {
-            groups[alert.weekKey] = { label: alert.weekLabel, alerts: [] };
+    // --- ABA GESTÃO COM NOTAS E STATUS ---
+    document.getElementById('inp-gestao-search')?.addEventListener('input', renderGestao);
+
+    function normalizeGestaoSearch(value) {
+      return (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+    }
+
+    function toggleGestaoWeek(weekKey) {
+      if (collapsedGestaoWeeks.has(weekKey)) {
+        collapsedGestaoWeeks.delete(weekKey);
+      } else {
+        collapsedGestaoWeeks.add(weekKey);
+      }
+      renderGestao();
+    }
+
+    function renderGestao() {
+      const container = document.getElementById('gestao-content');
+      const holidayDates = new Set((state.agenda || []).map(a => a.date));
+      const teacherFilter = getSelectedTeacher();
+      const searchTerm = normalizeGestaoSearch(document.getElementById('inp-gestao-search')?.value);
+      const alerts = [];
+
+      state.students.forEach(s => {
+        const cls = state.classes.find(c => c.id === s.classId);
+        if (!cls) return;
+
+        if (teacherFilter && cls.teacher !== teacherFilter) return;
+
+        const dates = Object.keys(state.attendance)
+          .filter(k => k.startsWith(`${s.id}_`))
+          .map(k => k.split('_')[1])
+          .sort();
+
+        let consecutiveAbsences = 0;
+        let consecutiveHours = 0;
+        const hourCost = cls.freq === '1x2h' ? 2 : (cls.freq === '1x1h30' ? 1.5 : 1);
+        const requiredConsecutiveAbsences = cls.freq === '1x2h' ? 1 : 2;
+
+        for (const date of dates) {
+          if (holidayDates.has(date)) continue;
+
+          const rec = state.attendance[`${s.id}_${date}`];
+          if (rec.status === 'f') {
+            consecutiveAbsences += 1;
+            consecutiveHours += hourCost;
+          } else {
+            // Presença, atraso e falta justificada interrompem a sequência de faltas não justificadas.
+            consecutiveAbsences = 0;
+            consecutiveHours = 0;
           }
-          groups[alert.weekKey].alerts.push(alert);
-          return groups;
-        }, {});
 
-        container.innerHTML = Object.entries(alertsByWeek)
-          .map(
-            ([weekKey, weekGroup]) => `
-        <div class="space-y-3">
-          <div class="bg-slate-800 text-white px-4 py-2 rounded-lg flex justify-between items-center">
-            <span class="font-bold text-xs">${escapeHTML(weekGroup.label)}</span>
-            <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">${weekGroup.alerts.length} ${weekGroup.alerts.length === 1 ? "aluno" : "alunos"}</span>
-          </div>
+          if (consecutiveAbsences >= requiredConsecutiveAbsences) {
+            const weekInfo = getWeekRange(date);
+            alerts.push({
+              student: s,
+              cls,
+              hours: consecutiveHours,
+              absences: consecutiveAbsences,
+              weekKey: weekInfo.key,
+              weekLabel: weekInfo.label,
+              triggerDate: date
+            });
+            break;
+          }
+        }
+      });
 
-          ${weekGroup.alerts
-            .map((a) => {
-              const noteData = state.managementNotes[a.student.id] || {
-                teacherNote: "",
-                secNote: "",
-                status: "aguardando",
-                resolvedAt: "",
-              };
-              const isAwaiting = noteData.status === "aguardando";
-              const isResolved = noteData.status === "resolvido";
-              const isSent = noteData.status === "enviado";
-              const absenceLabel =
-                a.absences === 1
-                  ? `${a.hours}h de falta`
-                  : `${a.absences} faltas consecutivas (${a.hours}h)`;
+      alerts.sort((a, b) => {
+        const weekComparison = b.weekKey.localeCompare(a.weekKey);
+        if (weekComparison !== 0) return weekComparison;
+        return a.student.name.localeCompare(b.student.name, 'pt-BR', { sensitivity: 'base' });
+      });
 
-              return `
-              <div class="bg-white p-3 rounded-lg border ${isResolved ? "border-emerald-200 bg-emerald-50/20" : isSent ? "border-blue-200 bg-blue-50/20" : "border-red-200"} space-y-2">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
-                  <div>
-                    <span class="font-bold text-slate-800 text-xs">${escapeHTML(a.student.name)}</span>
-                    <span class="ml-2 bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${escapeHTML(absenceLabel)}</span>
-                    <p class="text-[11px] text-slate-500">Turma: <b>${escapeHTML(a.cls.name)}</b> | Prof: <b>${escapeHTML(a.cls.teacher)}</b> | Resp: <b>${escapeHTML(a.student.parent || "Não inf.")}</b> (${escapeHTML(a.student.phone || "-")})</p>
-                  </div>
-                  
-                  <div class="flex items-center gap-1">
-                    <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isAwaiting ? "bg-amber-100 border-amber-400 text-amber-800 font-bold" : "bg-slate-50 text-slate-500"}">Aguardando</button>
-                    <button onclick="setGestaoStatus('${a.student.id}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? "bg-emerald-600 border-emerald-600 text-white font-bold" : "bg-slate-50 text-slate-500"}">Resolvido</button>
-                    <button onclick="setGestaoStatus('${a.student.id}', 'enviado')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isSent ? "bg-blue-600 border-blue-600 text-white font-bold" : "bg-slate-50 text-slate-500"}">Enviado</button>
-                  </div>
-                </div>
+      const filteredAlerts = searchTerm
+        ? alerts.filter(alert => normalizeGestaoSearch(alert.student.name).includes(searchTerm))
+        : alerts;
 
-                ${isResolved && noteData.resolvedAt ? `<p class="text-[10px] text-emerald-600 font-medium">✓ Resolvido em: ${noteData.resolvedAt}</p>` : ""}
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <div>
-                    <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota do Professor:</label>
-                    <textarea onchange="saveGestaoNote('${a.student.id}', 'teacherNote', this.value)" placeholder="Escreva observações do professor..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.teacherNote)}</textarea>
-                  </div>
-                  <div>
-                    <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota da Secretaria:</label>
-                    <textarea onchange="saveGestaoNote('${a.student.id}', 'secNote', this.value)" placeholder="Escreva observações da secretaria..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.secNote)}</textarea>
-                  </div>
-                </div>
-              </div>
-            `;
-            })
-            .join("")}
-        </div>
-      `,
-          )
-          .join("");
+      if (filteredAlerts.length === 0) {
+        container.innerHTML = searchTerm
+          ? '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum registro encontrado para este aluno.</p>'
+          : '<p class="text-xs text-slate-400 italic text-center py-4">Nenhum aluno com excesso de faltas encontrado para esta seleção.</p>';
+        return;
       }
 
-      function setGestaoStatus(studentId, status) {
-        if (!state.managementNotes[studentId]) {
-          state.managementNotes[studentId] = {
-            teacherNote: "",
-            secNote: "",
-            status: "aguardando",
-            resolvedAt: "",
-          };
-        }
+      const renderAlertCard = (a) => {
+        const noteData = state.managementNotes[a.student.id] || { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+        const isAwaiting = noteData.status === 'aguardando';
+        const isResolved = noteData.status === 'resolvido';
+        const isSent = noteData.status === 'enviado';
+        const absenceLabel = a.absences === 1
+          ? `${a.hours}h de falta`
+          : `${a.absences} faltas consecutivas (${a.hours}h)`;
 
-        state.managementNotes[studentId].status = status;
-        if (status === "resolvido") {
-          const now = new Date();
-          state.managementNotes[studentId].resolvedAt =
-            `${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-        } else {
-          state.managementNotes[studentId].resolvedAt = "";
-        }
-
-        saveState();
-        renderGestao();
-        const statusMessages = {
-          aguardando: "Marcado como Aguardando.",
-          resolvido: "Marcado como Resolvido!",
-          enviado: "Marcado como Enviado!",
+        const feedbackByStatus = {
+          aguardando: {
+            className: 'text-amber-700',
+            message: '⏳ Status atual: Aguardando'
+          },
+          resolvido: {
+            className: 'text-emerald-600',
+            message: noteData.resolvedAt ? `✓ Resolvido em: ${noteData.resolvedAt}` : '✓ Status atual: Resolvido'
+          },
+          enviado: {
+            className: 'text-blue-600',
+            message: '✉ Status atual: Enviado'
+          }
         };
-        showToast(statusMessages[status] || "Status atualizado!");
+        const feedback = feedbackByStatus[noteData.status] || feedbackByStatus.aguardando;
+
+        return `
+          <div class="bg-white p-3 rounded-lg border ${isResolved ? 'border-emerald-200 bg-emerald-50/20' : (isSent ? 'border-blue-200 bg-blue-50/20' : 'border-red-200')} space-y-2">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
+              <div>
+                <span class="font-bold text-slate-800 text-xs">${escapeHTML(a.student.name)}</span>
+                <span class="ml-2 bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${escapeHTML(absenceLabel)}</span>
+                <p class="text-[11px] text-slate-500">Turma: <b>${escapeHTML(a.cls.name)}</b> | Prof: <b>${escapeHTML(a.cls.teacher)}</b> | Resp: <b>${escapeHTML(a.student.parent || 'Não inf.')}</b> (${escapeHTML(a.student.phone || '-')})</p>
+                ${searchTerm ? `<p class="text-[10px] text-slate-400 mt-0.5">${escapeHTML(a.weekLabel)}</p>` : ''}
+              </div>
+
+              <div class="flex items-center gap-1">
+                <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isAwaiting ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
+                <button onclick="setGestaoStatus('${a.student.id}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? 'bg-emerald-600 border-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Resolvido</button>
+                <button onclick="setGestaoStatus('${a.student.id}', 'enviado')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isSent ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Enviado</button>
+              </div>
+            </div>
+
+            <p class="text-[10px] ${feedback.className} font-medium">${escapeHTML(feedback.message)}</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota do Professor:</label>
+                <textarea onchange="saveGestaoNote('${a.student.id}', 'teacherNote', this.value)" placeholder="Escreva observações do professor..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.teacherNote)}</textarea>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota da Secretaria:</label>
+                <textarea onchange="saveGestaoNote('${a.student.id}', 'secNote', this.value)" placeholder="Escreva observações da secretaria..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.secNote)}</textarea>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      if (searchTerm) {
+        container.innerHTML = filteredAlerts.map(renderAlertCard).join('');
+        return;
       }
 
-      function saveGestaoNote(studentId, field, value) {
-        if (!state.managementNotes[studentId]) {
-          state.managementNotes[studentId] = {
-            teacherNote: "",
-            secNote: "",
-            status: "aguardando",
-            resolvedAt: "",
-          };
+      const alertsByWeek = filteredAlerts.reduce((groups, alert) => {
+        if (!groups[alert.weekKey]) {
+          groups[alert.weekKey] = { label: alert.weekLabel, alerts: [] };
         }
-        state.managementNotes[studentId][field] = value;
-        saveState();
-        showToast("Anotação salva!");
+        groups[alert.weekKey].alerts.push(alert);
+        return groups;
+      }, {});
+
+      container.innerHTML = Object.entries(alertsByWeek).map(([weekKey, weekGroup]) => {
+        const isCollapsed = collapsedGestaoWeeks.has(weekKey);
+        return `
+          <div class="space-y-3">
+            <button type="button" onclick="toggleGestaoWeek('${weekKey}')" aria-expanded="${!isCollapsed}" class="w-full bg-slate-800 text-white px-4 py-2 rounded-lg flex justify-between items-center text-left">
+              <span class="font-bold text-xs">${escapeHTML(weekGroup.label)}</span>
+              <span class="flex items-center gap-2">
+                <span class="text-[10px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded">${weekGroup.alerts.length} ${weekGroup.alerts.length === 1 ? 'aluno' : 'alunos'}</span>
+                <span class="text-xs" aria-hidden="true">${isCollapsed ? '▼' : '▲'}</span>
+              </span>
+            </button>
+
+            <div class="${isCollapsed ? 'hidden' : ''} space-y-3">
+              ${weekGroup.alerts.map(renderAlertCard).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setGestaoStatus(studentId, status) {
+      if (!state.managementNotes[studentId]) {
+        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
       }
 
-      // --- BACKUP ---
-      document
-        .getElementById("btn-export-backup")
-        ?.addEventListener("click", () => {
-          const dataStr =
-            "data:text/json;charset=utf-8," +
-            encodeURIComponent(JSON.stringify(state));
-          const anchor = document.createElement("a");
-          anchor.setAttribute("href", dataStr);
-          anchor.setAttribute(
-            "download",
-            `cci_backup_${new Date().toISOString().split("T")[0]}.json`,
-          );
-          anchor.click();
-        });
-
-      document
-        .getElementById("inp-import-backup")
-        ?.addEventListener("change", (e) => {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-            try {
-              state = normalizeState(JSON.parse(event.target.result));
-              saveCachedState();
-              await supabaseWriteQueue;
-              await replaceSupabaseState(cloneState(state));
-              lastSyncedState = cloneState(state);
-              showToast("Backup restaurado!");
-              renderAll();
-            } catch (err) {
-              console.error("Erro ao restaurar backup:", err);
-              alert("Arquivo de backup inválido ou erro ao salvar no banco.");
-            }
-          };
-          if (e.target.files[0]) reader.readAsText(e.target.files[0]);
-        });
-
-      // --- POVOAR SELECTS DE TURMA RESPEITANDO O FILTRO DO PROFESSOR ---
-      function populateClassSelects() {
-        const filteredClasses = getFilteredClasses();
-        const currentChamadaVal =
-          document.getElementById("sel-class-chamada").value;
-        const currentReportVal =
-          document.getElementById("sel-class-report").value;
-
-        const options =
-          '<option value="">Selecione uma turma...</option>' +
-          filteredClasses
-            .map(
-              (c) =>
-                `<option value="${c.id}">${escapeHTML(c.name)} (Prof. ${escapeHTML(c.teacher)})</option>`,
-            )
-            .join("");
-
-        document.getElementById("sel-class-chamada").innerHTML = options;
-        document.getElementById("sel-class-report").innerHTML = options;
-
-        if (filteredClasses.some((c) => c.id === currentChamadaVal))
-          document.getElementById("sel-class-chamada").value =
-            currentChamadaVal;
-        if (filteredClasses.some((c) => c.id === currentReportVal))
-          document.getElementById("sel-class-report").value = currentReportVal;
+      state.managementNotes[studentId].status = status;
+      if (status === 'resolvido') {
+        const now = new Date();
+        state.managementNotes[studentId].resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      } else {
+        state.managementNotes[studentId].resolvedAt = '';
       }
 
-      function renderTeacherFilter() {
-        const currentTeacher = getSelectedTeacher();
-        const teachers = [...new Set(state.classes.map((c) => c.teacher))];
+      saveState();
+      renderGestao();
+      const statusMessages = {
+        aguardando: 'Marcado como Aguardando.',
+        resolvido: 'Marcado como Resolvido!',
+        enviado: 'Marcado como Enviado!'
+      };
+      showToast(statusMessages[status] || 'Status atualizado!');
+    }
 
-        document.getElementById("sel-filter-teacher").innerHTML =
-          '<option value="">Todos os professores</option>' +
-          teachers
-            .map(
-              (t) =>
-                `<option value="${escapeHTML(t)}"${t === currentTeacher ? " selected" : ""}>${escapeHTML(t)}</option>`,
-            )
-            .join("");
+    function saveGestaoNote(studentId, field, value) {
+      if (!state.managementNotes[studentId]) {
+        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
       }
+      state.managementNotes[studentId][field] = value;
+      saveState();
+      showToast('Anotação salva!');
+    }
 
-      function renderAll() {
-        renderTeacherFilter();
-        populateClassSelects();
-        renderClasses();
-        renderChamada();
-        renderAgenda();
-        renderRelatorio();
-        renderGestao();
-        renderSearchStudent();
-      }
+    // --- BACKUP ---
+    document.getElementById('btn-export-backup')?.addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+      const anchor = document.createElement('a');
+      anchor.setAttribute("href", dataStr);
+      anchor.setAttribute("download", `cci_backup_${new Date().toISOString().split('T')[0]}.json`);
+      anchor.click();
+    });
 
-      // Checar login ao abrir
-      checkAuth();
-    </script>
-  </body>
+    document.getElementById('inp-import-backup')?.addEventListener('change', (e) => {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          state = normalizeState(JSON.parse(event.target.result));
+          saveCachedState();
+          await supabaseWriteQueue;
+          await replaceSupabaseState(cloneState(state));
+          lastSyncedState = cloneState(state);
+          showToast('Backup restaurado!');
+          renderAll();
+        } catch (err) {
+          console.error('Erro ao restaurar backup:', err);
+          alert('Arquivo de backup inválido ou erro ao salvar no banco.');
+        }
+      };
+      if (e.target.files[0]) reader.readAsText(e.target.files[0]);
+    });
+
+    // --- POVOAR SELECTS DE TURMA RESPEITANDO O FILTRO DO PROFESSOR ---
+    function populateClassSelects() {
+      const filteredClasses = getFilteredClasses();
+      const currentChamadaVal = document.getElementById('sel-class-chamada').value;
+      const currentReportVal = document.getElementById('sel-class-report').value;
+
+      const options = '<option value="">Selecione uma turma...</option>' + 
+        filteredClasses.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (Prof. ${escapeHTML(c.teacher)})</option>`).join('');
+
+      document.getElementById('sel-class-chamada').innerHTML = options;
+      document.getElementById('sel-class-report').innerHTML = options;
+
+      if (filteredClasses.some(c => c.id === currentChamadaVal)) document.getElementById('sel-class-chamada').value = currentChamadaVal;
+      if (filteredClasses.some(c => c.id === currentReportVal)) document.getElementById('sel-class-report').value = currentReportVal;
+    }
+
+    function renderTeacherFilter() {
+      const currentTeacher = getSelectedTeacher();
+      const teachers = [...new Set(state.classes.map(c => c.teacher))];
+      
+      document.getElementById('sel-filter-teacher').innerHTML = '<option value="">Todos os professores</option>' + 
+        teachers.map(t => `<option value="${escapeHTML(t)}"${t === currentTeacher ? ' selected' : ''}>${escapeHTML(t)}</option>`).join('');
+    }
+
+    function renderAll() {
+      renderTeacherFilter();
+      populateClassSelects();
+      renderClasses();
+      renderChamada();
+      renderAgenda();
+      renderRelatorio();
+      renderGestao();
+      renderSearchStudent();
+    }
+
+    // Checar login ao abrir
+    checkAuth();
+  </script>
+</body>
 </html>
