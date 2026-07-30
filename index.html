@@ -1582,7 +1582,7 @@
         const feedbackByStatus = {
           aguardando: {
             className: 'text-amber-700',
-            message: '⏳ Status atual: Aguardando'
+            message: noteData.resolvedAt ? `⏳ Aguardando em: ${noteData.resolvedAt}` : '⏳ Status atual: Aguardando'
           },
           resolvido: {
             className: 'text-emerald-600',
@@ -1590,7 +1590,7 @@
           },
           enviado: {
             className: 'text-blue-600',
-            message: '✉ Status atual: Enviado'
+            message: noteData.resolvedAt ? `✉ Enviado em: ${noteData.resolvedAt}` : '✉ Status atual: Enviado'
           }
         };
         const feedback = feedbackByStatus[noteData.status] || feedbackByStatus.aguardando;
@@ -1667,12 +1667,8 @@
       }
 
       state.managementNotes[studentId].status = status;
-      if (status === 'resolvido') {
-        const now = new Date();
-        state.managementNotes[studentId].resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-      } else {
-        state.managementNotes[studentId].resolvedAt = '';
-      }
+      const now = new Date();
+      state.managementNotes[studentId].resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
       saveState();
       renderGestao();
