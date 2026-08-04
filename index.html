@@ -347,6 +347,58 @@
       managementNotes: {}
     });
 
+    const MANAGEMENT_NOTE_KEY_SEPARATOR = '::';
+
+    function getManagementNoteKey(studentId, weekKey) {
+      return `${studentId}${MANAGEMENT_NOTE_KEY_SEPARATOR}${weekKey}`;
+    }
+
+    function getLegacyManagementNoteKey(studentId) {
+      return `legacy${MANAGEMENT_NOTE_KEY_SEPARATOR}${studentId}`;
+    }
+
+    function normalizeManagementNotes(rawNotes) {
+      if (!rawNotes || typeof rawNotes !== 'object' || Array.isArray(rawNotes)) return {};
+
+      const normalized = {};
+      Object.entries(rawNotes).forEach(([rawKey, rawNote]) => {
+        const note = rawNote && typeof rawNote === 'object' ? rawNote : {};
+        let studentId = note.studentId || '';
+        let weekKey = note.weekKey || '';
+
+        if (!studentId) {
+          if (rawKey.startsWith(`legacy${MANAGEMENT_NOTE_KEY_SEPARATOR}`)) {
+            studentId = rawKey.slice(`legacy${MANAGEMENT_NOTE_KEY_SEPARATOR}`.length);
+          } else if (rawKey.includes(MANAGEMENT_NOTE_KEY_SEPARATOR)) {
+            const separatorIndex = rawKey.lastIndexOf(MANAGEMENT_NOTE_KEY_SEPARATOR);
+            studentId = rawKey.slice(0, separatorIndex);
+            weekKey = weekKey || rawKey.slice(separatorIndex + MANAGEMENT_NOTE_KEY_SEPARATOR.length);
+          } else {
+            // Backward compatibility with the former student-only state shape.
+            studentId = rawKey;
+          }
+        }
+
+        if (!studentId) return;
+
+        const normalizedKey = weekKey
+          ? getManagementNoteKey(studentId, weekKey)
+          : getLegacyManagementNoteKey(studentId);
+
+        normalized[normalizedKey] = {
+          id: note.id || generateUuid(),
+          studentId,
+          weekKey,
+          teacherNote: note.teacherNote || '',
+          secNote: note.secNote || '',
+          status: note.status || 'aguardando',
+          resolvedAt: note.resolvedAt || ''
+        };
+      });
+
+      return normalized;
+    }
+
     let state = loadCachedState();
     let stateInitialized = false;
     let supabaseClient = null;
@@ -360,7 +412,7 @@
         students: Array.isArray(data.students) ? data.students : [],
         attendance: data.attendance && typeof data.attendance === 'object' && !Array.isArray(data.attendance) ? data.attendance : {},
         agenda: Array.isArray(data.agenda) ? data.agenda : [],
-        managementNotes: data.managementNotes && typeof data.managementNotes === 'object' && !Array.isArray(data.managementNotes) ? data.managementNotes : {}
+        managementNotes: normalizeManagementNotes(data.managementNotes)
       };
     }
 
@@ -445,8 +497,10 @@
           description: item.description || '',
           type: item.type || 'holiday'
         })),
-        management_notes: Object.entries(value.managementNotes).map(([studentId, note]) => ({
-          student_id: studentId,
+        management_notes: Object.values(value.managementNotes).map(note => ({
+          id: note.id || generateUuid(),
+          student_id: note.studentId || '',
+          week_key: note.weekKey || null,
           teacher_note: note.teacherNote || '',
           sec_note: note.secNote || '',
           status: note.status || 'aguardando',
@@ -498,7 +552,15 @@
 
       const managementNotes = {};
       notesRows.forEach(note => {
-        managementNotes[note.student_id] = {
+        const weekKey = note.week_key || '';
+        const stateKey = weekKey
+          ? getManagementNoteKey(note.student_id, weekKey)
+          : getLegacyManagementNoteKey(note.student_id);
+
+        managementNotes[stateKey] = {
+          id: note.id || null,
+          studentId: note.student_id,
+          weekKey,
           teacherNote: note.teacher_note || '',
           secNote: note.sec_note || '',
           status: note.status || 'aguardando',
@@ -634,7 +696,7 @@
       await upsertRows('students', rows.students, 'id');
       await upsertAttendanceState(value);
       await upsertRows('agenda', rows.agenda, 'id');
-      await upsertRows('management_notes', rows.management_notes, 'student_id');
+      await upsertRows('management_notes', rows.management_notes, 'id');
     }
 
     function enqueueSupabaseWrite(operation) {
@@ -685,7 +747,7 @@
         { table: 'classes', primaryKey: 'id', ...getTableChanges(previousRows.classes, currentRows.classes, 'id') },
         { table: 'students', primaryKey: 'id', ...getTableChanges(previousRows.students, currentRows.students, 'id') },
         { table: 'agenda', primaryKey: 'id', ...getTableChanges(previousRows.agenda, currentRows.agenda, 'id') },
-        { table: 'management_notes', primaryKey: 'student_id', ...getTableChanges(previousRows.management_notes, currentRows.management_notes, 'student_id') }
+        { table: 'management_notes', primaryKey: 'id', ...getTableChanges(previousRows.management_notes, currentRows.management_notes, 'id') }
       ];
 
       // Excluir dependências primeiro, caso chaves estrangeiras sejam adicionadas futuramente.
@@ -746,12 +808,45 @@
     async function replaceSupabaseState(value) {
       if (!getSupabaseClient()) return;
 
-      await clearRemoteTable('management_notes', 'student_id');
+      await clearRemoteTable('management_notes', 'id');
       await clearRemoteTable('attendance', 'id');
       await clearRemoteTable('students', 'id');
       await clearRemoteTable('classes', 'id');
       await clearRemoteTable('agenda', 'id');
       await upsertStateToSupabase(value);
+    }
+
+    function migrateLegacyManagementNotes(value) {
+      const alerts = buildGestaoAlerts(value, { ignoreTeacherFilter: true });
+      const oldestAlertWeekByStudent = new Map();
+
+      alerts
+        .slice()
+        .sort((a, b) => a.weekKey.localeCompare(b.weekKey))
+        .forEach(alert => {
+          if (!oldestAlertWeekByStudent.has(alert.student.id)) {
+            oldestAlertWeekByStudent.set(alert.student.id, alert.weekKey);
+          }
+        });
+
+      let changed = false;
+      Object.entries(value.managementNotes || {}).forEach(([stateKey, note]) => {
+        if (note.weekKey) return;
+
+        const targetWeekKey = oldestAlertWeekByStudent.get(note.studentId);
+        if (!targetWeekKey) return;
+
+        const targetStateKey = getManagementNoteKey(note.studentId, targetWeekKey);
+        if (value.managementNotes[targetStateKey]) return;
+
+        delete value.managementNotes[stateKey];
+        note.id = note.id || generateUuid();
+        note.weekKey = targetWeekKey;
+        value.managementNotes[targetStateKey] = note;
+        changed = true;
+      });
+
+      return changed;
     }
 
     async function initializeState() {
@@ -761,6 +856,7 @@
       const cachedState = loadCachedState();
       if (!hasSupabaseConfig()) {
         state = cachedState;
+        if (migrateLegacyManagementNotes(state)) saveCachedState();
         lastSyncedState = cloneState(state);
         console.warn('Supabase não configurado; usando somente o cache local.');
         showToast('Banco não configurado. Usando dados locais.');
@@ -773,12 +869,17 @@
         // Migração automática: envia os dados antigos do localStorage quando o banco ainda está vazio.
         if (!stateHasData(remoteState) && stateHasData(cachedState)) {
           state = cachedState;
+          migrateLegacyManagementNotes(state);
           await upsertStateToSupabase(state);
           lastSyncedState = cloneState(state);
           saveCachedState();
           showToast('Dados locais migrados para o Supabase!');
         } else {
           state = remoteState;
+          const migratedLegacyNotes = migrateLegacyManagementNotes(state);
+          if (migratedLegacyNotes) {
+            await upsertRows('management_notes', stateToRows(state).management_notes, 'id');
+          }
           lastSyncedState = cloneState(state);
           saveCachedState();
         }
@@ -979,7 +1080,11 @@
         if (studentIdSet.has(studentId)) delete state.attendance[key];
       });
 
-      studentIds.forEach(studentId => delete state.managementNotes[studentId]);
+      Object.keys(state.managementNotes).forEach(noteKey => {
+        if (studentIdSet.has(state.managementNotes[noteKey]?.studentId)) {
+          delete state.managementNotes[noteKey];
+        }
+      });
 
       saveCachedState();
       closeEditClassModal();
@@ -1501,33 +1606,31 @@
       renderGestao();
     }
 
-    function renderGestao() {
-      const container = document.getElementById('gestao-content');
-      const holidayDates = new Set((state.agenda || []).map(a => a.date));
-      const teacherFilter = getSelectedTeacher();
-      const searchTerm = normalizeGestaoSearch(document.getElementById('inp-gestao-search')?.value);
+    function buildGestaoAlerts(value = state, { ignoreTeacherFilter = false } = {}) {
+      const holidayDates = new Set((value.agenda || []).map(a => a.date));
+      const teacherFilter = ignoreTeacherFilter ? '' : getSelectedTeacher();
       const alerts = [];
 
-      state.students.forEach(s => {
-        const cls = state.classes.find(c => c.id === s.classId);
+      value.students.forEach(s => {
+        const cls = value.classes.find(c => c.id === s.classId);
         if (!cls) return;
-
         if (teacherFilter && cls.teacher !== teacherFilter) return;
 
-        const dates = Object.keys(state.attendance)
+        const dates = Object.keys(value.attendance)
           .filter(k => k.startsWith(`${s.id}_`))
-          .map(k => k.split('_')[1])
+          .map(k => k.slice(k.lastIndexOf('_') + 1))
           .sort();
 
         let consecutiveAbsences = 0;
         let consecutiveHours = 0;
+        const alertedWeeks = new Set();
         const hourCost = cls.freq === '1x2h' ? 2 : (cls.freq === '1x1h30' ? 1.5 : 1);
         const requiredConsecutiveAbsences = cls.freq === '1x2h' ? 1 : 2;
 
         for (const date of dates) {
           if (holidayDates.has(date)) continue;
 
-          const rec = state.attendance[`${s.id}_${date}`];
+          const rec = value.attendance[`${s.id}_${date}`];
           if (rec.status === 'f') {
             consecutiveAbsences += 1;
             consecutiveHours += hourCost;
@@ -1539,6 +1642,9 @@
 
           if (consecutiveAbsences >= requiredConsecutiveAbsences) {
             const weekInfo = getWeekRange(date);
+            if (alertedWeeks.has(weekInfo.key)) continue;
+
+            alertedWeeks.add(weekInfo.key);
             alerts.push({
               student: s,
               cls,
@@ -1548,10 +1654,37 @@
               weekLabel: weekInfo.label,
               triggerDate: date
             });
-            break;
           }
         }
       });
+
+      return alerts;
+    }
+
+    function getGestaoNote(studentId, weekKey) {
+      return state.managementNotes[getManagementNoteKey(studentId, weekKey)] || null;
+    }
+
+    function ensureGestaoNote(studentId, weekKey) {
+      const stateKey = getManagementNoteKey(studentId, weekKey);
+      if (!state.managementNotes[stateKey]) {
+        state.managementNotes[stateKey] = {
+          id: generateUuid(),
+          studentId,
+          weekKey,
+          teacherNote: '',
+          secNote: '',
+          status: 'aguardando',
+          resolvedAt: ''
+        };
+      }
+      return state.managementNotes[stateKey];
+    }
+
+    function renderGestao() {
+      const container = document.getElementById('gestao-content');
+      const searchTerm = normalizeGestaoSearch(document.getElementById('inp-gestao-search')?.value);
+      const alerts = buildGestaoAlerts();
 
       alerts.sort((a, b) => {
         const weekComparison = b.weekKey.localeCompare(a.weekKey);
@@ -1571,7 +1704,12 @@
       }
 
       const renderAlertCard = (a) => {
-        const noteData = state.managementNotes[a.student.id] || { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
+        const noteData = getGestaoNote(a.student.id, a.weekKey) || {
+          teacherNote: '',
+          secNote: '',
+          status: 'aguardando',
+          resolvedAt: ''
+        };
         const isAwaiting = noteData.status === 'aguardando';
         const isResolved = noteData.status === 'resolvido';
         const isSent = noteData.status === 'enviado';
@@ -1606,9 +1744,9 @@
               </div>
 
               <div class="flex items-center gap-1">
-                <button onclick="setGestaoStatus('${a.student.id}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isAwaiting ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
-                <button onclick="setGestaoStatus('${a.student.id}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? 'bg-emerald-600 border-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Resolvido</button>
-                <button onclick="setGestaoStatus('${a.student.id}', 'enviado')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isSent ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Enviado</button>
+                <button onclick="setGestaoStatus('${a.student.id}', '${a.weekKey}', 'aguardando')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isAwaiting ? 'bg-amber-100 border-amber-400 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500'}">Aguardando</button>
+                <button onclick="setGestaoStatus('${a.student.id}', '${a.weekKey}', 'resolvido')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isResolved ? 'bg-emerald-600 border-emerald-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Resolvido</button>
+                <button onclick="setGestaoStatus('${a.student.id}', '${a.weekKey}', 'enviado')" class="px-2 py-1 rounded text-[11px] font-semibold border ${isSent ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-slate-50 text-slate-500'}">Enviado</button>
               </div>
             </div>
 
@@ -1617,11 +1755,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
               <div>
                 <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota do Professor:</label>
-                <textarea onchange="saveGestaoNote('${a.student.id}', 'teacherNote', this.value)" placeholder="Escreva observações do professor..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.teacherNote)}</textarea>
+                <textarea onchange="saveGestaoNote('${a.student.id}', '${a.weekKey}', 'teacherNote', this.value)" placeholder="Escreva observações do professor..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.teacherNote)}</textarea>
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nota da Secretaria:</label>
-                <textarea onchange="saveGestaoNote('${a.student.id}', 'secNote', this.value)" placeholder="Escreva observações da secretaria..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.secNote)}</textarea>
+                <textarea onchange="saveGestaoNote('${a.student.id}', '${a.weekKey}', 'secNote', this.value)" placeholder="Escreva observações da secretaria..." class="w-full border rounded p-1.5 text-xs h-16 outline-none focus:ring-1 focus:ring-blue-400">${escapeHTML(noteData.secNote)}</textarea>
               </div>
             </div>
           </div>
@@ -1661,14 +1799,11 @@
       }).join('');
     }
 
-    function setGestaoStatus(studentId, status) {
-      if (!state.managementNotes[studentId]) {
-        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
-      }
-
-      state.managementNotes[studentId].status = status;
+    function setGestaoStatus(studentId, weekKey, status) {
+      const note = ensureGestaoNote(studentId, weekKey);
+      note.status = status;
       const now = new Date();
-      state.managementNotes[studentId].resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      note.resolvedAt = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
       saveState();
       renderGestao();
@@ -1680,11 +1815,9 @@
       showToast(statusMessages[status] || 'Status atualizado!');
     }
 
-    function saveGestaoNote(studentId, field, value) {
-      if (!state.managementNotes[studentId]) {
-        state.managementNotes[studentId] = { teacherNote: '', secNote: '', status: 'aguardando', resolvedAt: '' };
-      }
-      state.managementNotes[studentId][field] = value;
+    function saveGestaoNote(studentId, weekKey, field, value) {
+      const note = ensureGestaoNote(studentId, weekKey);
+      note[field] = value;
       saveState();
       showToast('Anotação salva!');
     }
@@ -1703,6 +1836,7 @@
       reader.onload = async (event) => {
         try {
           state = normalizeState(JSON.parse(event.target.result));
+          migrateLegacyManagementNotes(state);
           saveCachedState();
           await supabaseWriteQueue;
           await replaceSupabaseState(cloneState(state));
